@@ -1,0 +1,93 @@
+[
+  {
+    "memory_id": "d342470c-7ba1-4e3e-bed7-8fcaeb4f9eb9",
+    "user_id": "user_001",
+    "memory_type": "profile",
+    "content": "User strictly builds backend systems using Python and FastAPI.",
+    "status": "active",
+    "source": {
+      "thread_id": "thread_001",
+      "message_ids": [
+        "19916b7f-17c5-40ab-b9c8-bd27c7b77e62"
+      ],
+      "created_at": "2026-10-02T11:31:36.373081Z"
+    },
+    "version": 1,
+    "supersedes_memory_id": null,
+    "created_at": "2026-10-02T11:31:36.949972Z",
+    "updated_at": "2026-10-02T11:31:36.949984Z",
+    "metadata": {}
+  },
+  {
+    "memory_id": "43294ef8-84de-4c7a-b280-f1a23e4bda71",
+    "user_id": "user_001",
+    "memory_type": "goal",
+    "content": "User wants to design the authentication endpoint for their API.",
+    "status": "superseded",
+    "source": {
+      "thread_id": "thread_001",
+      "message_ids": [
+        "8c852a49-9c06-49a0-8f71-f91a605e18f6"
+      ],
+      "created_at": "2026-10-02T11:49:00.313444Z"
+    },
+    "version": 1,
+    "supersedes_memory_id": null,
+    "created_at": "2026-10-02T11:49:06.428482Z",
+    "updated_at": "2026-10-02T11:49:23.790093Z",
+    "metadata": {}
+  },
+  {
+    "memory_id": "04010268-497b-463d-a29b-53f51cdb89e1",
+    "user_id": "user_001",
+    "memory_type": "fact",
+    "content": "User wants to design the authentication endpoint for their API. User is developing or working on an API (asked to design an authentication endpoint).",
+    "status": "active",
+    "source": {
+      "thread_id": "thread_001",
+      "message_ids": [
+        "8c852a49-9c06-49a0-8f71-f91a605e18f6"
+      ],
+      "created_at": "2026-10-02T11:49:00.313467Z"
+    },
+    "version": 2,
+    "supersedes_memory_id": null,
+    "created_at": "2026-10-02T11:49:23.789681Z",
+    "updated_at": "2026-10-02T11:49:23.789739Z",
+    "metadata": {
+      "source_history": [
+        {
+          "thread_id": "thread_001",
+          "message_ids": [
+            "8c852a49-9c06-49a0-8f71-f91a605e18f6"
+          ]
+        },
+        {
+          "thread_id": "thread_001",
+          "message_ids": [
+            "8c852a49-9c06-49a0-8f71-f91a605e18f6"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "memory_id": "3ef5efac-4c5f-4cce-a10a-fbf5610b7f1d",
+    "user_id": "user_001",
+    "memory_type": "profile",
+    "content": "User is located in Bangalore, India.",
+    "status": "active",
+    "source": {
+      "thread_id": "thread_001",
+      "message_ids": [
+        "6227ad43-73be-4e12-a6ba-73bdd1d8eb88"
+      ],
+      "created_at": "2026-10-02T12:25:20.419530Z"
+    },
+    "version": 1,
+    "supersedes_memory_id": null,
+    "created_at": "2026-10-02T12:25:25.478505Z",
+    "updated_at": "2026-10-02T12:25:25.530783Z",
+    "metadata": {}
+  }
+]

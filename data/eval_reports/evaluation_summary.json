@@ -1,0 +1,71 @@
+{
+  "total_tests": 14,
+  "passed_tests": 14,
+  "avg_recall_at_k": 0.4524,
+  "avg_precision_at_k": 0.1905,
+  "avg_mrr": 0.3929,
+  "avg_ndcg": 0.3586,
+  "avg_routing_score": 0.3571,
+  "avg_groundedness": 0.7143,
+  "avg_consolidation_score": 0.2857,
+  "avg_latency_ms": 11.64,
+  "total_retries": 20,
+  "scenario_breakdown": {
+    "stm": {
+      "count": 2,
+      "recall": 1.0,
+      "precision": 0.3333,
+      "mrr": 1.0,
+      "latency": 17.92
+    },
+    "ltm": {
+      "count": 2,
+      "recall": 0.5,
+      "precision": 0.1667,
+      "mrr": 0.25,
+      "latency": 15.36
+    },
+    "pdf": {
+      "count": 2,
+      "recall": 1.0,
+      "precision": 0.3333,
+      "mrr": 0.3333,
+      "latency": 15.74
+    },
+    "stm_ltm": {
+      "count": 1,
+      "recall": 0.0,
+      "precision": 0.0,
+      "mrr": 0.0,
+      "latency": 15.21
+    },
+    "stm_pdf": {
+      "count": 1,
+      "recall": 0.5,
+      "precision": 0.3333,
+      "mrr": 1.0,
+      "latency": 18.16
+    },
+    "ltm_pdf": {
+      "count": 1,
+      "recall": 0.5,
+      "precision": 0.3333,
+      "mrr": 0.3333,
+      "latency": 16.43
+    },
+    "stm_ltm_pdf": {
+      "count": 1,
+      "recall": 0.3333,
+      "precision": 0.3333,
+      "mrr": 1.0,
+      "latency": 15.12
+    },
+    "consolidation": {
+      "count": 4,
+      "recall": 0.0,
+      "precision": 0.0,
+      "mrr": 0.0,
+      "latency": 0.0
+    }
+  }
+}

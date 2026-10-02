@@ -1,0 +1,62 @@
+========================================================================
+Trace: 1c274770-09a9-4e4f-97cf-71f2e1bead74
+User: user_001
+Thread: thread_001
+Started: 2026-10-02T12:48:20.945919Z
+Completed: 2026-10-02T12:48:32.172135Z
+Query: Hii
+
+Retrieval plan:
+  use_stm: False
+  use_ltm: False
+  use_pdf: False
+  reasoning: User message is a simple greeting with no context or requests. No episodic memory, long-term preferences, or external PDFs are relevant.
+  confidence: 0.74
+  metadata: {}
+
+Retrieval results:
+  STM: not used
+  LTM: not used
+  PDF: not used
+
+Processing:
+  Reranker: method=reciprocal_rank_fusion, input_count=0, output_count=0
+  Context: item_count=0, estimated_tokens=0, max_tokens=6000
+
+Answer:
+  insufficient_evidence=False, cited_item_ids=[]
+Validation:
+  is_valid=True, needs_retrieval=False, reason=None
+Metadata:
+  latency_ms=11226.211799999874, retry_count=0, retrieval_errors={}
+========================================================================
+Trace: a4197125-82b3-4383-b858-b3bb0ddf05db
+User: user_001
+Thread: thread_001
+Started: 2026-10-02T12:49:26.292793Z
+Completed: 2026-10-02T12:49:42.367045Z
+Query: What endpoint were we designing?
+
+Retrieval plan:
+  use_stm: True
+  use_ltm: False
+  use_pdf: False
+  reasoning: User asked an episodic recall question about a prior conversation ('What endpoint were we designing?'). Short-term conversation memory (STM) is the appropriate source to retrieve the recent discussion. Long-term memory and PDFs are not relevant.
+  confidence: 0.91
+  metadata: {"intent": "episodic_recall", "original_query": "What endpoint were we designing?"}
+
+Retrieval results:
+  STM: 5 item(s); ids=["9efbbe38-e9c0-4129-8dba-cf5eb0d91d6a", "f3f009cb-3891-4457-81ed-b9a5f5a49a06", "f7b720c4-6c1f-4a09-84bd-42db14930b5b", "b8674b77-1b45-4075-bc65-6f5215bce546", "8c852a49-9c06-49a0-8f71-f91a605e18f6"]; latency_ms=381.4908000022115
+  LTM: not used
+  PDF: not used
+
+Processing:
+  Reranker: method=reciprocal_rank_fusion, input_count=5, output_count=5
+  Context: item_count=5, estimated_tokens=67, max_tokens=6000
+
+Answer:
+  insufficient_evidence=False, cited_item_ids=["b8674b77-1b45-4075-bc65-6f5215bce546", "8c852a49-9c06-49a0-8f71-f91a605e18f6"]
+Validation:
+  is_valid=True, needs_retrieval=False, reason=The draft answer matches the STM evidence: user and assistant messages state we were designing the authentication endpoint. Both cited item_ids exist in evidence.
+Metadata:
+  latency_ms=16074.2496999992, retry_count=0, retrieval_errors={}
