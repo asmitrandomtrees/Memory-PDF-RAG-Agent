@@ -44,8 +44,9 @@ class FakeChatModel:
             },
         )
 
-    def with_structured_output(self, output_schema):
+    def with_structured_output(self, output_schema, **kwargs):
         self.output_schema = output_schema
+        self.kwargs = kwargs
         self.structured_model = FakeStructuredModel(
             {"answer": "Structured answer"}
         )
@@ -145,7 +146,31 @@ def test_provider_initializes_azure_model_from_settings(monkeypatch) -> None:
 
     assert provider.chat_model.azure_endpoint == "https://example.openai.azure.com"
     assert provider.chat_model.deployment_name == "test-deployment"
-    assert provider.chat_model.temperature == 0.0
+    assert provider.chat_model.temperature is None or provider.chat_model.temperature == 0.0
+
+
+def test_structured_output_falls_back_when_temperature_rejected() -> None:
+    class ModelRejectingTemperature(FakeChatModel):
+        def invoke(self, messages, **kwargs):
+            if "temperature" in kwargs:
+                raise RuntimeError("Unsupported value: 'temperature' does not support 0.0 with this model.")
+            return super().invoke(messages, **kwargs)
+
+        def with_structured_output(self, output_schema):
+            class StructuredWrapper:
+                def invoke(inner_self, messages, **kwargs):
+                    if "temperature" in kwargs:
+                        raise RuntimeError("Unsupported value: 'temperature' does not support 0.0 with this model.")
+                    return Answer(answer="Fallback structured answer")
+            return StructuredWrapper()
+
+    provider = AzureOpenAIProvider(chat_model=ModelRejectingTemperature())
+    result = provider.structured_output(
+        [ChatMessage(role="user", content="Hello")],
+        Answer,
+        temperature=0.0,
+    )
+    assert result == Answer(answer="Fallback structured answer")
 
 
 def test_provider_rejects_missing_azure_settings(monkeypatch) -> None:

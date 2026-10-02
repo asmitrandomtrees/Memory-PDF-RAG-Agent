@@ -41,8 +41,16 @@ class Settings(BaseSettings):
     # Conversation store
     conversation_store_type: str = Field("jsonl", alias="CONVERSATION_STORE_TYPE")
     conversation_data_path: str = Field(
-        "./data/conversations/dev",
+        "./data/conversations",
         alias="CONVERSATION_DATA_PATH",
+    )
+    ltm_memory_path: str = Field(
+        "./data/memories/ltm.json",
+        alias="LTM_MEMORY_PATH",
+    )
+    trace_data_path: str = Field(
+        "./data/traces/development",
+        alias="TRACE_DATA_PATH",
     )
 
     # Retrieval

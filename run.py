@@ -1,31 +1,39 @@
+import argparse
+
 from app.config.settings import get_settings
 from app.contracts.runtime import AgentRequest
-from app.graph.graph import Phase0Graph
-from app.runtime.agent import AgentRuntime
-from app.runtime.conversation_store import (
-    JsonlConversationStore,
-)
+from app.runtime.factory import create_runtime
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--user", required=True)
+    parser.add_argument("--thread", required=True)
+    parser.add_argument("--query")
+    args = parser.parse_args()
+
     settings = get_settings()
-
-    store = JsonlConversationStore(
-        settings.conversation_data_path
-    )
-
-    runtime = AgentRuntime(
-        conversation_store=store,
-        graph=Phase0Graph(),
-    )
+    runtime = create_runtime(settings=settings)
 
     print("=" * 60)
     print("Conversational Memory Agent")
-    print("Phase 0")
+    print("STM + LTM RAG Agent")
     print("=" * 60)
 
-    user_id = input("User ID: ").strip()
-    thread_id = input("Thread ID: ").strip()
+    user_id = args.user
+    thread_id = args.thread
+
+    if args.query is not None:
+        response = runtime.handle(
+            AgentRequest(
+                user_id=user_id,
+                thread_id=thread_id,
+                message=args.query,
+            )
+        )
+        print(f"\nAssistant: {response.answer}")
+        print(f"Trace ID: {response.trace_id}")
+        return
 
     while True:
         message = input("\nYou: ").strip()

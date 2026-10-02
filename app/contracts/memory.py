@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Any, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 MemoryType = Literal[
@@ -32,6 +32,15 @@ class MemorySource(BaseModel):
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
+
+    @field_validator("message_ids", mode="before")
+    @classmethod
+    def coerce_message_ids(cls, v: Any) -> list[str]:
+        if v is None:
+            return []
+        if isinstance(v, str):
+            return [v]
+        return list(v)
 
 
 class MemoryRecord(BaseModel):

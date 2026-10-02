@@ -51,20 +51,6 @@ nosetests.xml
 # Jupyter
 .ipynb_checkpoints/
 
-# Development conversation data
-data/conversations/dev/*
-!data/conversations/dev/.gitkeep
-!data/conversations/dev/stm_ltm/.gitkeep
-!data/conversations/dev/pdf/.gitkeep
-
-# Development PDFs
-data/pdfs/development/*
-!data/pdfs/development/.gitkeep
-
-# Development traces
-data/traces/development/*
-!data/traces/development/.gitkeep
-
 # Vector stores / local databases
 vectorstore/
 chroma/
