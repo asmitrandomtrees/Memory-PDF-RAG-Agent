@@ -20,7 +20,7 @@ from app.graph.nodes.retrieval import LTMNode, PDFNode, STMNode
 from app.graph.schemas import AnswerDraft, resolve_calendar_day
 from app.graph.state import GraphState
 from app.llm.provider import LLMProvider
-from app.rag.reranker import ReciprocalRankFusionReranker, Reranker
+from app.graph.reranker import ReciprocalRankFusionReranker, Reranker
 from app.observability.tracker import ObservabilityTracker
 from app.tracing.tracer import TraceSink
 

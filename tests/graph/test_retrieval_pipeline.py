@@ -20,7 +20,7 @@ from app.graph.schemas import (
 from app.contracts.runtime import AgentRequest
 from app.memory.ltm.retriever import LTMRetriever
 from app.memory.stm.retriever import STMRetriever
-from app.rag.reranker import ReciprocalRankFusionReranker
+from app.graph.reranker import ReciprocalRankFusionReranker
 
 
 class FakeLLM:
