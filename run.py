@@ -54,7 +54,7 @@ def main() -> None:
         )
 
         print(f"\nAssistant: {response.answer}")
-        print(f"Trace ID: {response.trace_id}")
+        # print(f"Trace ID: {response.trace_id}")
 
 
 if __name__ == "__main__":
