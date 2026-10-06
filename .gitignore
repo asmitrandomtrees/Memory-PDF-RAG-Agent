@@ -76,3 +76,12 @@ Thumbs.db
 tempCodeRunnerFile.py
 .pypirc
 .streamlit/secrets.toml
+
+# Runtime / generated data
+data/*
+
+# Keep the directory structure
+!data/**/
+
+# Keep .gitkeep files
+!data/**/.gitkeep
