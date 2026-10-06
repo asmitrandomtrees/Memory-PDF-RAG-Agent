@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -31,7 +32,10 @@ _PLANNING_PROMPT = ChatPromptTemplate.from_messages(
             "episodic conversation recall, LTM for durable personal facts "
             "and preferences, and PDF for questions about supplied documents. "
             "Select every source that may provide useful evidence, and no "
-            "source that is irrelevant. An episodic_recall intent must use "
+            "source that is irrelevant. Use STM for short follow-up fragments "
+            "that depend on the previous turn, such as yes/no answers, "
+            "preferences, refinements, or phrases containing this, that, both, "
+            "previous, earlier, or same. An episodic_recall intent must use "
             "STM. Return a RetrievalPlan.",
         ),
         ("human", "Original query: {query}\nAnalysis: {analysis}"),
@@ -78,4 +82,60 @@ class RetrievalPlanner:
 
         if analysis.intent == "episodic_recall" and not plan.use_stm:
             return plan.model_copy(update={"use_stm": True})
+        if _looks_like_contextual_follow_up(query) and not plan.use_stm:
+            return plan.model_copy(update={"use_stm": True})
         return plan
+
+
+_FOLLOW_UP_TERMS = {
+    "also",
+    "both",
+    "either",
+    "earlier",
+    "whom",
+    "it",
+    "same",
+    "that",
+    "this",
+    "those",
+    "previous",
+    "preferably",
+    "yes",
+    "no",
+}
+
+_STANDALONE_SMALL_TALK = {
+    "hello",
+    "hey",
+    "hi",
+    "hii",
+    "thanks",
+    "thank",
+    "okay",
+    "ok",
+}
+
+
+def _looks_like_contextual_follow_up(query: str) -> bool:
+    normalized = query.strip().lower()
+    if not normalized:
+        return False
+
+    tokens = re.findall(r"[a-z0-9']+", normalized)
+    if not tokens:
+        return False
+
+    if set(tokens) <= _STANDALONE_SMALL_TALK:
+        return False
+
+    token_set = set(tokens)
+    if token_set & _FOLLOW_UP_TERMS:
+        return True
+
+    if len(tokens) <= 3 and normalized.endswith("?"):
+        return True
+
+    if "," in normalized and len(tokens) <= 5 and not normalized.endswith("?"):
+        return True
+
+    return False

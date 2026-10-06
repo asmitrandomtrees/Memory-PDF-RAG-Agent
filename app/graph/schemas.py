@@ -30,11 +30,26 @@ class QueryAnalysis(BaseModel):
             return [v]
         return list(v)
 
+    @model_validator(mode="before")
+    @classmethod
+    def discard_partial_calendar_date(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+
+        date_month = data.get("date_month")
+        date_day = data.get("date_day")
+        if (date_month is None) != (date_day is None):
+            return {
+                **data,
+                "date_month": None,
+                "date_day": None,
+                "date_year": None,
+            }
+
+        return data
+
     @model_validator(mode="after")
     def validate_calendar_date(self) -> "QueryAnalysis":
-        if (self.date_month is None) != (self.date_day is None):
-            raise ValueError("date_month and date_day must be provided together")
-
         if self.date_month is not None and self.date_day is not None:
             year = self.date_year or 2000
             date(year, self.date_month, self.date_day)

@@ -87,6 +87,7 @@ def create_runtime(
         llm=llm,
         stm_retriever=stm_retriever,
         episodic_retriever=episodic_retriever,
+        conversation_store=conversation_store,
         ltm_retriever=ltm_retriever,
         pdf_retriever=pdf_retriever,
         reranker=reranker,

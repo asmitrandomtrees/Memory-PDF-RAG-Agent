@@ -6,7 +6,10 @@ from app.contracts.retrieval import (
     RetrievalResult,
     STMQuery,
 )
+from app.contracts.runtime import ConversationStore
 from app.graph.state import GraphState
+from app.memory.stm.context import STMContextExpander
+from app.memory.stm.context_budget import STMContextBudget
 from app.observability.tracker import ObservabilityTracker
 
 
@@ -16,12 +19,21 @@ class STMNode:
         *,
         stm_retriever: Any | None = None,
         episodic_retriever: Any | None = None,
+        conversation_store: ConversationStore | None = None,
+        context_expander: STMContextExpander | None = None,
+        context_budget: STMContextBudget | None = None,
         top_k: int = 5,
         recency_weight: float = 0.5,
         tracker: ObservabilityTracker | None = None,
     ) -> None:
         self.stm_retriever = stm_retriever
         self.episodic_retriever = episodic_retriever
+        self.conversation_store = conversation_store
+        self.context_expander = context_expander or STMContextExpander(
+            window_size=1,
+            recent_message_count=6,
+        )
+        self.context_budget = context_budget
         self.top_k = top_k
         self.recency_weight = recency_weight
         self.tracker = tracker or ObservabilityTracker()
@@ -54,6 +66,7 @@ class STMNode:
                         recency_weight=self.recency_weight,
                     )
                 )
+                result = self._expand_thread_context(result)
             self.tracker.track_retrieval(
                 source="stm",
                 retrieved_count=len(result.items),
@@ -63,6 +76,53 @@ class STMNode:
         except Exception as exc:
             self.tracker.track_retrieval(source="stm", retrieved_count=0, error=True)
             return {"stm_error": str(exc)}
+
+    def _expand_thread_context(
+        self,
+        result: RetrievalResult,
+    ) -> RetrievalResult:
+        if self.conversation_store is None:
+            return result
+
+        conversation = self.conversation_store.load(
+            str(result.metadata.get("user_id", "")),
+            str(result.metadata.get("thread_id", "")),
+        )
+        if not conversation.messages:
+            return result
+
+        items = self.context_expander.expand(
+            items=result.items,
+            conversation=conversation,
+            include_recent_messages=True,
+        )
+        item_ids = {item.item_id for item in items}
+        items = [
+            *[
+                item
+                for item in result.items
+                if item.item_id not in item_ids
+            ],
+            *items,
+        ]
+        if self.context_budget is not None:
+            items = self.context_budget.select(items)
+
+        ranked_items = [
+            item.model_copy(update={"rank": rank})
+            for rank, item in enumerate(items, start=1)
+        ]
+
+        return result.model_copy(
+            update={
+                "items": ranked_items,
+                "metadata": {
+                    **result.metadata,
+                    "expanded_with_recent_messages": True,
+                    "raw_retrieved_count": len(result.items),
+                },
+            }
+        )
 
 
 class LTMNode:
