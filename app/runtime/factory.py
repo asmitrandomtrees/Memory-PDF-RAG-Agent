@@ -19,6 +19,7 @@ from app.memory.stm.episodic_retriever import STMEpisodicRetriever
 from app.memory.stm.retriever import STMRetriever
 from app.memory.stm.writer import STMWriter
 from app.graph.reranker import Reranker
+from app.rag.pdf_retriever import PDFRetriever
 from app.runtime.agent import AgentRuntime
 from app.runtime.conversation_store import JsonlConversationStore
 from app.tracing.exporters import (
@@ -82,6 +83,12 @@ def create_runtime(
         embeddings=embeddings,
         vector_store=vector_store,
     )
+    if pdf_retriever is None:
+        pdf_retriever = PDFRetriever(
+            embeddings=embeddings,
+            vector_store=vector_store,
+            collection=settings.pdf_collection,
+        )
 
     graph = RetrievalPipeline(
         llm=llm,

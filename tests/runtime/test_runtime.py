@@ -8,6 +8,7 @@ from app.graph.graph import Phase0Graph
 from app.graph.schemas import AnswerDraft, AnswerValidation, QueryAnalysis
 from app.contracts.routing import RetrievalPlan
 from app.memory.ltm.schemas import LTMExtractionOutput
+from app.rag.pdf_retriever import PDFRetriever
 from app.runtime.agent import AgentRuntime
 from app.runtime.conversation_store import (
     JsonlConversationStore,
@@ -172,6 +173,7 @@ def test_runtime_executes_stm_ltm_graph_and_persists_messages(tmp_path) -> None:
         vector_store=vector_store,
         conversation_store=conversation_store,
     )
+    assert isinstance(runtime.graph.pdf_node.retriever, PDFRetriever)
 
     response = runtime.handle(
         AgentRequest(

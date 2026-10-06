@@ -32,3 +32,11 @@ class VectorStore(Protocol):
         ids: list[str],
     ) -> None:
         ...
+
+    def get_by_metadata(
+        self,
+        *,
+        collection: str,
+        filters: dict[str, Any],
+    ) -> list[RetrievedItem]:
+        ...

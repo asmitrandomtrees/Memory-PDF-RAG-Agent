@@ -1,14 +1,24 @@
 # Production LangGraph Agent
 
-Phase 0 skeleton for a modular conversational AI system with STM, LTM, PDF RAG, LangGraph orchestration, runtime/session management, persistence, tracing, and evaluation.
+Conversational AI system with short-term memory (STM), long-term memory (LTM), PDF retrieval-augmented generation, LangGraph orchestration, runtime/session management, persistence, tracing, and evaluation.
 
-## Current status
+The runtime includes STM, LTM, and PDF retrieval in its LangGraph pipeline. PDF ingestion extracts page text, chunks it, creates embeddings, and stores chunks in the configured PDF collection. Image-only/scanned PDFs need OCR before ingestion.
 
-Phase 0 only. Contracts, boundaries, configuration, JSONL conversation persistence, runtime skeleton, and CLI are implemented.
+## Ingest PDFs
 
-Actual STM retrieval, LTM retrieval/consolidation, PDF RAG retrieval, and the full LangGraph workflow are intentionally deferred.
+Place PDFs in `data/pdfs` and run:
 
-## Run
+```bash
+python scripts/ingest_pdfs.py
+```
+
+To ingest a different folder:
+
+```bash
+python scripts/ingest_pdfs.py path/to/pdfs
+```
+
+## Runtime Conversation
 
 ```bash
 python run.py --user user_001 --thread thread_001
@@ -18,10 +28,4 @@ Or:
 
 ```bash
 python run.py --user user_001 --thread thread_001 --query "Hello"
-```
-
-## Test
-
-```bash
-pytest
 ```
