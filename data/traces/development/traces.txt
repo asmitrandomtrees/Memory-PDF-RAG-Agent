@@ -60,8 +60,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=The draft answer matches the STM evidence: user and assistant messages state we were designing the authentication endpoint. Both cited item_ids exist in evidence.
 Metadata:
   latency_ms=16074.2496999992, retry_count=0, retrieval_errors={}
-<<<<<<< Updated upstream
-=======
 ========================================================================
 Trace: b2206573-7a69-4c8a-a12e-40a88b9ecfc1
 User: user_001
@@ -93,7 +91,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=Each claim in the draft is supported by the supplied evidence items. The cited item_ids (302e8410, 8c852a49, 722dfdf8, 038a9b18, b8674b77, 74c3bfc4, c22c4752, 6227ad43) all appear in the evidence and match the draft’s assertions about what was discussed on 2026-10-02. No unsupported source-specific claims were found.
 Metadata:
   latency_ms=41226.48389999995, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: 4fd30aff-1c51-4b2d-8b84-7cbd8bb589c4
 User: user_001
 Thread: thread_002
@@ -124,7 +121,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=Draft content aligns with user's stated plans and location per provided evidence (user plans to go out this weekend, enjoys going out to relax, located in Bangalore). Suggestions are generic local recommendations; no unsupported claims about the user beyond provided memories.
 Metadata:
   latency_ms=32360.466799997084, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: 7ea5eda2-66e2-4c92-a0d2-38b69f9afc9c
 User: user_001
 Thread: thread_002
@@ -155,7 +151,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=Draft is a helpful, supported, and general response. The cited stm item exists.
 Metadata:
   latency_ms=16355.431999996654, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: 70365f23-ec0f-4ef0-a17b-2b8c70f96f24
 User: user_001
 Thread: thread_002
@@ -186,7 +181,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=Draft's statements are supported by the provided memory items: user likes movie suggestions (item_id 4063ade0-412f-4ea1-bfd6-6c58ef1a542e) and is located in Bangalore (item_id 3ef5efac-4c5f-4cce-a10a-fbf5610b7f1d). Both cited item_ids exist.
 Metadata:
   latency_ms=20448.56269999582, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: f5c858d4-4b98-4265-823d-5bab2046126e
 User: user_001
 Thread: thread_002
@@ -217,7 +211,6 @@ Validation:
   is_valid=True, needs_retrieval=True, reason=Draft asks follow-up and includes item_ids; user requested recommendations with verified item_id references/sources. Retrieval needed to verify current theatrical listings in Bangalore for Oct 10-11 and to fetch streaming availability and evidence for titles.
 Metadata:
   latency_ms=59846.626400001696, retry_count=1, retrieval_errors={}
-========================================================================
 Trace: e66bbbae-be04-49f9-955d-f3db773225de
 User: user_001
 Thread: thread_002
@@ -248,7 +241,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=None
 Metadata:
   latency_ms=14567.820799995388, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: 4c779e38-ea28-4d01-9f6c-2d098dcb24d8
 User: user_001
 Thread: thread_002
@@ -279,7 +271,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=The draft correctly reflects the user message 'that was the answer to your previous question' (item e22d976f-b293-460d-890c-bcbf5f60d71a) and aligns with earlier user comments about going out and watching a movie with friends (items 0042e929-5f9e-4679-845e-6048254ade63, ec4adf5c-be4b-4f34-8705-9aebfc4114d7, 9c4970d9-b506-42a9-acf8-07d4ff672192). The cited item_id exists.
 Metadata:
   latency_ms=22733.2757999975, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: 3bb87ba0-96f1-4899-a362-8a205deb4c3b
 User: user_001
 Thread: thread_002
@@ -310,7 +301,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=None
 Metadata:
   latency_ms=40679.56939999567, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: e5387529-5c44-416e-bebe-1efaa0956865
 User: user_001
 Thread: thread_003
@@ -341,7 +331,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=The draft's claims about the user (planning to go out this weekend to have fun and relax) are supported by the provided evidence item 319cfd97-d98f-44d4-91e4-c62e83eaf7c3, which exists.
 Metadata:
   latency_ms=24224.05740000022, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: f61f1f94-a38c-4fdf-a865-4d8776e38fff
 User: user_001
 Thread: thread_003
@@ -372,7 +361,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=LTM memory item 3ef5efac-4c5f-4cce-a10a-fbf5610b7f1d explicitly states 'User is located in Bangalore, India.' The cited item_id exists in the provided evidence.
 Metadata:
   latency_ms=23036.111399999754, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: 3c00d634-cad4-480d-9a0e-77db32a65717
 User: user_001
 Thread: thread_003
@@ -403,7 +391,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=None
 Metadata:
   latency_ms=10411.581599999863, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: b6f689a1-c611-489d-9431-2292643f9035
 User: user_001
 Thread: thread_003
@@ -434,7 +421,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=None
 Metadata:
   latency_ms=18450.02280000017, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: c7b1d6a3-7d3f-450d-bf8c-ea4e19d68f49
 User: user_001
 Thread: thread_003
@@ -465,7 +451,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=Draft is consistent with user's earlier messages and requests; it asks sensible clarifying questions and offers options based on known context (Bangalore, new releases, any weekend day). Evidence supports that location is Bangalore and user said any day of this weekend.
 Metadata:
   latency_ms=20287.92220000014, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: 5411380c-ad7e-4e01-8d49-b70f424cfc1d
 User: user_001
 Thread: thread_003
@@ -496,7 +481,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=None
 Metadata:
   latency_ms=14609.249799999816, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: c143778d-77d1-432e-9767-5d6197062fae
 User: user_001
 Thread: thread_003
@@ -527,7 +511,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=Draft is supported: user decided to watch Drishyam: The Conclusion (evidence a943...), user prefers thrillers (8706...), user planning theatre with friends and mentioned Saturday (f3b2a0c4...); cited item_ids exist.
 Metadata:
   latency_ms=13298.317700000098, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: 53dba08b-9f38-4594-b309-676e1e950bcb
 User: user_001
 Thread: thread_003
@@ -558,7 +541,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=The draft's central claim (that the user asked whether they need to watch Drishyam 1 and 2) is supported by the supplied evidence item a6f2ea5e-49e1-4038-93aa-6245af550a7f. The rest of the draft offers general viewing-advice that doesn't require additional source-specific evidence.
 Metadata:
   latency_ms=15408.392299999832, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: ac1893cd-a7cb-4591-b883-a0fc5a769f64
 User: user_001
 Thread: thread_003
@@ -589,7 +571,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=None
 Metadata:
   latency_ms=15265.152500000113, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: f573d416-54b4-4f20-b321-8d3a32fb5361
 User: user_001
 Thread: thread_003
@@ -620,7 +601,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=None
 Metadata:
   latency_ms=22885.277399999723, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: bfdb421b-22ef-452b-9807-ec72ff66bad5
 User: user_001
 Thread: thread_003
@@ -651,7 +631,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=None
 Metadata:
   latency_ms=9486.83360000041, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: f5c286bc-70da-4b21-a0ca-65ba5bd02b13
 User: user_001
 Thread: thread_003
@@ -682,7 +661,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=None
 Metadata:
   latency_ms=15818.709300000137, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: af6b3e94-25bb-43f2-828d-824f678dfda4
 User: user_001
 Thread: thread_003
@@ -713,7 +691,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=None
 Metadata:
   latency_ms=19704.66579999993, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: 6977cdeb-2709-4ad6-a332-252bd90ddc3c
 User: user_001
 Thread: thread_003
@@ -744,7 +721,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=None
 Metadata:
   latency_ms=14689.590200000566, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: 0c9433a1-6280-4365-b5ad-455050b07bc7
 User: user_001
 Thread: thread_003
@@ -775,7 +751,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=None
 Metadata:
   latency_ms=13688.87309999991, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: 290c1119-3dea-4e5d-b4f3-4844c4bf78ec
 User: user_001
 Thread: thread_003
@@ -806,7 +781,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=None
 Metadata:
   latency_ms=16143.361899999945, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: 229fcc95-26ae-4f66-b067-777c3f501485
 User: user_001
 Thread: thread_003
@@ -837,7 +811,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=Supported by evidence item 9ca1fbfc-1ddf-41e3-ba77-72234504da30, where you wrote: "I have decided to watch Drishyam the conclusion." All cited item_id values exist in the provided evidence.
 Metadata:
   latency_ms=25046.384600000238, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: 856ea02e-bc2f-4776-9c0a-946fd7c8e85c
 User: user_001
 Thread: thread_003
@@ -868,7 +841,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=Both cited item_ids exist in the provided evidence. Item cd7fa66a-ecd7-45bb-a6a3-f8200fb11cb4 contains the user’s selection 'Saturday, Hindi', and item 9f38b156-b479-4b27-af0d-7add8e7a9bb3 confirms the Hindi translation 'शनिवार' (Shanivaar). The draft answer accurately reflects these sources.
 Metadata:
   latency_ms=18556.025099999715, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: a75e7f17-2823-41cc-b6e6-ee4cb35ef6f9
 User: user_001
 Thread: thread_003
@@ -899,7 +871,6 @@ Validation:
   is_valid=False, needs_retrieval=False, reason=The draft is invalid because it claims uncertainty about whether the user is going with friends despite item_id 014460e8 (present in the evidence) explicitly stating “I am planning to watch a movie at theatre with my friends.” Item_ids 3729edff-be15-4e43-85db-e53320354e6b and 31b47683-5642-4d0f-9b01-89306f1ac2eb do exist in the supplied evidence. The draft correctly flags excessive/unnecessary offers, but its justification that the ‘friends’ claim is uncertain is unsupported by the evidence., retry_exhausted=True
 Metadata:
   latency_ms=66154.53239999988, retry_count=2, retrieval_errors={"pdf": "PDF retriever is not configured"}
-========================================================================
 Trace: 47035650-1da2-4571-957c-81c8630e07f6
 User: user_001
 Thread: thread_004
@@ -930,7 +901,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=None
 Metadata:
   latency_ms=14729.568700000527, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: 750d8896-6dcc-4b54-a1cd-8d0682a700be
 User: user_001
 Thread: thread_004
@@ -961,7 +931,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=None
 Metadata:
   latency_ms=12987.702399999762, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: f9e86128-d0c4-41d2-b870-b209e313820b
 User: user_001
 Thread: thread_004
@@ -992,7 +961,6 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=Draft is supported by memory items: travel dates (item_id 8bf235e5-9b6f-4187-9627-160795cf2e34) and movie plans/Oct17-19 mention (item_id 297dc2a1-87b9-4daa-a43a-249c740c096b). Both cited item_ids exist.
 Metadata:
   latency_ms=18865.857799999503, retry_count=0, retrieval_errors={}
-========================================================================
 Trace: 209468cc-2ad2-4711-a345-b00c1d539830
 User: user_001
 Thread: thread_004
@@ -1023,4 +991,3 @@ Validation:
   is_valid=True, needs_retrieval=False, reason=The draft's claims about the user are supported by stored items: destination Chikmagalur (item 3fe267d3-9965-4162-934f-500b33165b2b), traveling with friends (item 1ef773a7-11d3-4559-afe6-e28e632d5cf3), travel dates Oct 17–19 (item c2f4d181-59bb-480a-a369-defd90a3c977), and location Bangalore (item 3ef5efac-4c5f-4cce-a10a-fbf5610b7f1d).
 Metadata:
   latency_ms=60640.51780000045, retry_count=0, retrieval_errors={}
->>>>>>> Stashed changes

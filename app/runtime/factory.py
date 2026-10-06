@@ -18,7 +18,7 @@ from app.memory.ltm.writer import LTMWriter
 from app.memory.stm.episodic_retriever import STMEpisodicRetriever
 from app.memory.stm.retriever import STMRetriever
 from app.memory.stm.writer import STMWriter
-from app.rag.reranker import Reranker
+from app.graph.reranker import Reranker
 from app.runtime.agent import AgentRuntime
 from app.runtime.conversation_store import JsonlConversationStore
 from app.tracing.exporters import (
