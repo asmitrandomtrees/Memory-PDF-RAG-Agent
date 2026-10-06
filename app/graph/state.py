@@ -4,6 +4,7 @@ from typing import Any, TypedDict
 from app.contracts.context import AgentContext
 from app.contracts.retrieval import (
     MergedRetrievalResult,
+    RetrievedItem,
     RetrievalResult,
 )
 from app.contracts.routing import RetrievalPlan
@@ -19,6 +20,7 @@ class GraphState(TypedDict, total=False):
     query_analysis: QueryAnalysis
     date_start_at: datetime | None
     date_end_at: datetime | None
+    recent_items: list[RetrievedItem]
 
     retrieval_plan: RetrievalPlan
 

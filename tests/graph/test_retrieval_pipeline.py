@@ -1,8 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from threading import Barrier
 
 import pytest
 
+from app.contracts.conversation import Conversation, ConversationMessage
 from app.contracts.context import AgentContext
 from app.contracts.retrieval import RetrievalResult, RetrievedItem
 from app.contracts.routing import RetrievalPlan
@@ -38,6 +39,7 @@ class FakeLLM:
         self.answer_drafts = list(answer_drafts or [])
         self.validations = list(validations or [])
         self.rewrites = list(rewrites or [])
+        self.rewrite_prompts = []
 
     def structured_output(self, messages, output_schema, *, temperature=None):
         if output_schema is QueryAnalysis:
@@ -58,6 +60,7 @@ class FakeLLM:
                 return self.validations.pop(0)
             return AnswerValidation(is_valid=True)
         if output_schema is RewrittenQuery:
+            self.rewrite_prompts.append(messages)
             if self.rewrites:
                 return self.rewrites.pop(0)
             return RewrittenQuery(query="clarified query")
@@ -89,6 +92,19 @@ class FakeRetriever:
         return self.result
 
 
+class FakeConversationStore:
+    def __init__(self, conversation: Conversation) -> None:
+        self.conversation = conversation
+
+    def load(self, user_id: str, thread_id: str) -> Conversation:
+        assert user_id == self.conversation.user_id
+        assert thread_id == self.conversation.thread_id
+        return self.conversation
+
+    def append_message(self, message: ConversationMessage) -> None:
+        self.conversation.messages.append(message)
+
+
 def _result(source: str, item_id: str, content: str, rank: int = 1):
     return RetrievalResult(
         source=source,
@@ -114,12 +130,14 @@ def _pipeline(
     episodic=None,
     ltm=None,
     pdf=None,
+    conversation_store=None,
     max_context_tokens: int = 100,
 ) -> RetrievalPipeline:
     return RetrievalPipeline(
         llm=FakeLLM(analysis=analysis, plan=plan),
         stm_retriever=stm,
         episodic_retriever=episodic,
+        conversation_store=conversation_store,
         ltm_retriever=ltm,
         pdf_retriever=pdf,
         context_builder=ContextBuilder(
@@ -271,6 +289,23 @@ def test_yearless_calendar_date_resolves_to_most_recent_past_occurrence() -> Non
     assert end_at == datetime(2026, 9, 19, tzinfo=INDIA_TIMEZONE)
 
 
+def test_query_analysis_discards_partial_calendar_date() -> None:
+    analysis = QueryAnalysis.model_validate(
+        {
+            "intent": "general",
+            "normalized_query": "any day of this weekend",
+            "date_month": 10,
+            "date_day": None,
+            "date_year": None,
+        }
+    )
+
+    assert analysis.date_month is None
+    assert analysis.date_day is None
+    assert analysis.date_year is None
+    assert resolve_calendar_day(analysis) == (None, None)
+
+
 def test_context_builder_respects_combined_token_budget() -> None:
     builder = ContextBuilder(max_tokens=2, chars_per_token=4)
     items = [
@@ -327,6 +362,109 @@ def test_empty_plan_returns_empty_results_without_retriever_calls() -> None:
     assert ltm.calls == 0
     assert state["merged_results"].items == []
     assert state["context"].items == []
+
+
+def test_short_follow_up_forces_stm_and_includes_recent_thread_context() -> None:
+    conversation = Conversation(
+        user_id="user_001",
+        thread_id="thread_002",
+        messages=[
+            ConversationMessage(
+                message_id="assistant_question",
+                user_id="user_001",
+                thread_id="thread_002",
+                role="assistant",
+                content=(
+                    "Do you prefer watching in theaters, at home via "
+                    "streaming, or both? Any sensitivity to violence?"
+                ),
+                timestamp=datetime(2026, 10, 5, 16, 16, tzinfo=timezone.utc),
+            ),
+            ConversationMessage(
+                message_id="user_follow_up",
+                user_id="user_001",
+                thread_id="thread_002",
+                role="user",
+                content="both, no such sensitivity",
+                timestamp=datetime(2026, 10, 5, 16, 17, tzinfo=timezone.utc),
+            ),
+        ],
+    )
+    analysis = QueryAnalysis(
+        intent="general",
+        normalized_query="both, no such sensitivity",
+    )
+    stm = FakeRetriever(
+        RetrievalResult(
+            source="stm",
+            query="both, no such sensitivity",
+            items=[],
+            metadata={
+                "user_id": "user_001",
+                "thread_id": "thread_002",
+                "recency_weight": 0.5,
+            },
+        )
+    )
+    pipeline = _pipeline(
+        analysis=analysis,
+        plan=RetrievalPlan(),
+        stm=stm,
+        conversation_store=FakeConversationStore(conversation),
+    )
+
+    state = pipeline.invoke(
+        user_id="user_001",
+        thread_id="thread_002",
+        query="both, no such sensitivity",
+    )
+
+    assert state["retrieval_plan"].use_stm is True
+    assert stm.calls == 1
+    assert [
+        item.item_id
+        for item in state["merged_results"].items
+    ] == [
+        "assistant_question",
+        "user_follow_up",
+    ]
+    assert all(
+        item.metadata["context_type"] == "recent"
+        for item in state["merged_results"].items
+    )
+
+
+def test_tiny_whom_follow_up_forces_stm() -> None:
+    analysis = QueryAnalysis(
+        intent="general",
+        normalized_query="with whom",
+    )
+    stm = FakeRetriever(
+        RetrievalResult(
+            source="stm",
+            query="with whom",
+            items=[],
+            metadata={
+                "user_id": "user_001",
+                "thread_id": "thread_003",
+                "recency_weight": 0.5,
+            },
+        )
+    )
+    pipeline = _pipeline(
+        analysis=analysis,
+        plan=RetrievalPlan(),
+        stm=stm,
+    )
+
+    state = pipeline.invoke(
+        user_id="user_001",
+        thread_id="thread_003",
+        query="with whom",
+    )
+
+    assert state["retrieval_plan"].use_stm is True
+    assert stm.calls == 1
 
 
 def test_context_compression_preserves_pdf_chunk_provenance() -> None:
@@ -582,6 +720,61 @@ def test_pipeline_rewrites_invalid_citation_and_retries_once() -> None:
     assert state["retry_count"] == 1
     assert retriever.calls == 2
     assert state["validation"]["is_valid"] is True
+
+
+def test_rewrite_retries_keep_original_user_query() -> None:
+    llm = FakeLLM(
+        analysis=QueryAnalysis(
+            intent="general",
+            normalized_query="with whom",
+        ),
+        plan=RetrievalPlan(use_stm=True),
+        answer_drafts=[
+            AnswerDraft(answer="Unsupported one.", cited_item_ids=["bad1"]),
+            AnswerDraft(answer="Unsupported two.", cited_item_ids=["bad2"]),
+            AnswerDraft(answer="You planned to go with friends.", cited_item_ids=["friend"]),
+        ],
+        rewrites=[
+            RewrittenQuery(query="first rewritten query"),
+            RewrittenQuery(query="second rewritten query"),
+        ],
+    )
+    retriever = FakeRetriever(
+        RetrievalResult(
+            source="stm",
+            query="with whom",
+            items=[
+                RetrievedItem(
+                    item_id="friend",
+                    source="stm",
+                    content="I am planning to watch a movie at theatre with my friends",
+                    metadata={"thread_id": "thread_003"},
+                )
+            ],
+        )
+    )
+    pipeline = RetrievalPipeline(
+        llm=llm,
+        stm_retriever=retriever,
+        max_retries=2,
+    )
+
+    state = pipeline.invoke(
+        user_id="user_001",
+        thread_id="thread_003",
+        query="with whom",
+    )
+
+    assert state["answer"] == "You planned to go with friends."
+    assert len(llm.rewrite_prompts) == 2
+    assert all(
+        "Original query: with whom" in prompt[-1].content
+        for prompt in llm.rewrite_prompts
+    )
+    assert all(
+        "Original query: first rewritten query" not in prompt[-1].content
+        for prompt in llm.rewrite_prompts
+    )
 
 
 def test_pipeline_stops_after_retry_limit_and_returns_safe_fallback() -> None:

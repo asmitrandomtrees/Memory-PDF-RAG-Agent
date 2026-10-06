@@ -89,5 +89,432 @@
     "created_at": "2026-10-02T12:25:25.478505Z",
     "updated_at": "2026-10-02T12:25:25.530783Z",
     "metadata": {}
+  },
+  {
+    "memory_id": "a4c32614-7153-46d6-97b5-a9210ef75d3b",
+    "user_id": "user_001",
+    "memory_type": "preference",
+    "content": "User enjoys going out to have fun and relax.",
+    "status": "active",
+    "source": {
+      "thread_id": "thread_002",
+      "message_ids": [
+        "0042e929-5f9e-4679-845e-6048254ade63"
+      ],
+      "created_at": "2026-10-05T16:10:00.719937Z"
+    },
+    "version": 1,
+    "supersedes_memory_id": null,
+    "created_at": "2026-10-05T16:10:07.961306Z",
+    "updated_at": "2026-10-05T16:10:07.961309Z",
+    "metadata": {}
+  },
+  {
+    "memory_id": "4063ade0-412f-4ea1-bfd6-6c58ef1a542e",
+    "user_id": "user_001",
+    "memory_type": "preference",
+    "content": "User likes getting movie suggestions for films to watch at a nearby cinema.",
+    "status": "superseded",
+    "source": {
+      "thread_id": "thread_002",
+      "message_ids": [
+        "9c4970d9-b506-42a9-acf8-07d4ff672192"
+      ],
+      "created_at": "2026-10-05T16:13:30.932403Z"
+    },
+    "version": 1,
+    "supersedes_memory_id": null,
+    "created_at": "2026-10-05T16:13:36.804408Z",
+    "updated_at": "2026-10-06T05:19:36.284410Z",
+    "metadata": {}
+  },
+  {
+    "memory_id": "8706a9d9-0610-4627-8f71-7b9ade7237b5",
+    "user_id": "user_001",
+    "memory_type": "preference",
+    "content": "User prefers thriller genre.",
+    "status": "active",
+    "source": {
+      "thread_id": "thread_002",
+      "message_ids": [
+        "047fc4db-0319-432d-b646-54ac96a20d66"
+      ],
+      "created_at": "2026-10-05T16:15:12.325045Z"
+    },
+    "version": 1,
+    "supersedes_memory_id": null,
+    "created_at": "2026-10-05T16:15:18.253364Z",
+    "updated_at": "2026-10-05T16:15:18.253374Z",
+    "metadata": {}
+  },
+  {
+    "memory_id": "ba287630-4ee2-4de0-88ba-a98a16e1af4f",
+    "user_id": "user_001",
+    "memory_type": "preference",
+    "content": "User prefers Hindi-language content.",
+    "status": "superseded",
+    "source": {
+      "thread_id": "thread_002",
+      "message_ids": [
+        "047fc4db-0319-432d-b646-54ac96a20d66"
+      ],
+      "created_at": "2026-10-05T16:15:12.325113Z"
+    },
+    "version": 1,
+    "supersedes_memory_id": null,
+    "created_at": "2026-10-05T16:15:23.265874Z",
+    "updated_at": "2026-10-06T05:29:22.424571Z",
+    "metadata": {}
+  },
+  {
+    "memory_id": "7c204a31-6483-4ef2-b3fe-33a07bf11cc8",
+    "user_id": "user_001",
+    "memory_type": "fact",
+    "content": "User has decided to watch the film 'Drishyam: The Conclusion'.",
+    "status": "superseded",
+    "source": {
+      "thread_id": "thread_002",
+      "message_ids": [
+        "23656679-07dc-4391-86af-861872ed33ac"
+      ],
+      "created_at": "2026-10-05T16:19:27.812708Z"
+    },
+    "version": 1,
+    "supersedes_memory_id": null,
+    "created_at": "2026-10-05T16:19:35.764657Z",
+    "updated_at": "2026-10-06T05:31:10.240264Z",
+    "metadata": {}
+  },
+  {
+    "memory_id": "cb291759-e1c0-4e21-8a58-5f49c6e5d437",
+    "user_id": "user_001",
+    "memory_type": "goal",
+    "content": "User is planning to watch a movie at a theatre with their friends.",
+    "status": "superseded",
+    "source": {
+      "thread_id": "thread_003",
+      "message_ids": [
+        "014460e8-9903-447d-bbd1-2419c4ac0d6b"
+      ],
+      "created_at": "2026-10-06T05:17:53.966256Z"
+    },
+    "version": 1,
+    "supersedes_memory_id": null,
+    "created_at": "2026-10-06T05:17:58.850717Z",
+    "updated_at": "2026-10-06T05:19:44.490707Z",
+    "metadata": {}
+  },
+  {
+    "memory_id": "bd06f835-93f9-4240-b51f-61ee623b99ed",
+    "user_id": "user_001",
+    "memory_type": "preference",
+    "content": "User likes getting movie suggestions for films to watch at a nearby cinema. Prefers to watch movies in Bangalore only.",
+    "status": "active",
+    "source": {
+      "thread_id": "thread_003",
+      "message_ids": [
+        "988f0999-93a4-4319-ac49-fe9ee6734b7e"
+      ],
+      "created_at": "2026-10-06T05:19:29.154669Z"
+    },
+    "version": 2,
+    "supersedes_memory_id": null,
+    "created_at": "2026-10-06T05:19:36.284401Z",
+    "updated_at": "2026-10-06T05:19:36.284405Z",
+    "metadata": {
+      "source_history": [
+        {
+          "thread_id": "thread_002",
+          "message_ids": [
+            "9c4970d9-b506-42a9-acf8-07d4ff672192"
+          ]
+        },
+        {
+          "thread_id": "thread_003",
+          "message_ids": [
+            "988f0999-93a4-4319-ac49-fe9ee6734b7e"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "memory_id": "7bae8903-26b0-4bc4-b9fe-318dd3b1038f",
+    "user_id": "user_001",
+    "memory_type": "goal",
+    "content": "User is planning to watch a movie at a theatre with their friends. Planning to watch any latest released movie.",
+    "status": "superseded",
+    "source": {
+      "thread_id": "thread_003",
+      "message_ids": [
+        "988f0999-93a4-4319-ac49-fe9ee6734b7e"
+      ],
+      "created_at": "2026-10-06T05:19:29.154719Z"
+    },
+    "version": 2,
+    "supersedes_memory_id": null,
+    "created_at": "2026-10-06T05:19:44.490699Z",
+    "updated_at": "2026-10-06T05:29:30.688754Z",
+    "metadata": {
+      "source_history": [
+        {
+          "thread_id": "thread_003",
+          "message_ids": [
+            "014460e8-9903-447d-bbd1-2419c4ac0d6b"
+          ]
+        },
+        {
+          "thread_id": "thread_003",
+          "message_ids": [
+            "988f0999-93a4-4319-ac49-fe9ee6734b7e"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "memory_id": "8d742462-97c6-44e6-8129-50622a2819b5",
+    "user_id": "user_001",
+    "memory_type": "preference",
+    "content": "User prefers Hindi-language content. Prefers Hindi language for communication.",
+    "status": "active",
+    "source": {
+      "thread_id": "thread_003",
+      "message_ids": [
+        "cd7fa66a-ecd7-45bb-a6a3-f8200fb11cb4"
+      ],
+      "created_at": "2026-10-06T05:29:16.140912Z"
+    },
+    "version": 2,
+    "supersedes_memory_id": null,
+    "created_at": "2026-10-06T05:29:22.424480Z",
+    "updated_at": "2026-10-06T05:29:22.424550Z",
+    "metadata": {
+      "source_history": [
+        {
+          "thread_id": "thread_002",
+          "message_ids": [
+            "047fc4db-0319-432d-b646-54ac96a20d66"
+          ]
+        },
+        {
+          "thread_id": "thread_003",
+          "message_ids": [
+            "cd7fa66a-ecd7-45bb-a6a3-f8200fb11cb4"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "memory_id": "f3b2a0c4-fdd3-4074-bed2-ba7302226005",
+    "user_id": "user_001",
+    "memory_type": "fact",
+    "content": "User is planning to watch a movie at a theatre with their friends. Planning to watch any latest released movie. Mentioned 'Saturday' (may indicate availability or a day-specific request).",
+    "status": "superseded",
+    "source": {
+      "thread_id": "thread_003",
+      "message_ids": [
+        "cd7fa66a-ecd7-45bb-a6a3-f8200fb11cb4"
+      ],
+      "created_at": "2026-10-06T05:29:16.140995Z"
+    },
+    "version": 3,
+    "supersedes_memory_id": null,
+    "created_at": "2026-10-06T05:29:30.688734Z",
+    "updated_at": "2026-10-06T05:55:36.456756Z",
+    "metadata": {
+      "source_history": [
+        {
+          "thread_id": "thread_003",
+          "message_ids": [
+            "014460e8-9903-447d-bbd1-2419c4ac0d6b"
+          ]
+        },
+        {
+          "thread_id": "thread_003",
+          "message_ids": [
+            "988f0999-93a4-4319-ac49-fe9ee6734b7e"
+          ]
+        },
+        {
+          "thread_id": "thread_003",
+          "message_ids": [
+            "cd7fa66a-ecd7-45bb-a6a3-f8200fb11cb4"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "memory_id": "a9439325-c830-47dd-9f00-44ea7e213ce5",
+    "user_id": "user_001",
+    "memory_type": "goal",
+    "content": "User has decided to watch the film 'Drishyam: The Conclusion'. User has decided to watch the movie 'Drishyam the Conclusion'.",
+    "status": "active",
+    "source": {
+      "thread_id": "thread_003",
+      "message_ids": [
+        "9ca1fbfc-1ddf-41e3-ba77-72234504da30"
+      ],
+      "created_at": "2026-10-06T05:31:01.412155Z"
+    },
+    "version": 2,
+    "supersedes_memory_id": null,
+    "created_at": "2026-10-06T05:31:10.240256Z",
+    "updated_at": "2026-10-06T05:31:10.240260Z",
+    "metadata": {
+      "source_history": [
+        {
+          "thread_id": "thread_002",
+          "message_ids": [
+            "23656679-07dc-4391-86af-861872ed33ac"
+          ]
+        },
+        {
+          "thread_id": "thread_003",
+          "message_ids": [
+            "9ca1fbfc-1ddf-41e3-ba77-72234504da30"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "memory_id": "46d98b22-f9b1-4eab-8c69-a5359571a6ed",
+    "user_id": "user_001",
+    "memory_type": "preference",
+    "content": "Prefers the movie 'Digger' as a better option to watch with friends.",
+    "status": "superseded",
+    "source": {
+      "thread_id": "thread_003",
+      "message_ids": [
+        "375dcfe9-34a0-48cb-8cc2-9037dda0e208"
+      ],
+      "created_at": "2026-10-06T05:33:17.452419Z"
+    },
+    "version": 1,
+    "supersedes_memory_id": null,
+    "created_at": "2026-10-06T05:33:23.267702Z",
+    "updated_at": "2026-10-06T05:40:30.794293Z",
+    "metadata": {}
+  },
+  {
+    "memory_id": "7882bb5b-150d-4a1c-a374-9250afd3d82c",
+    "user_id": "user_001",
+    "memory_type": "preference",
+    "content": "Prefers the movie 'Digger' as a better option to watch with friends. User is interested in the movie \"Digger\" and asked the assistant to look it up.",
+    "status": "active",
+    "source": {
+      "thread_id": "thread_003",
+      "message_ids": [
+        "614e3cdc-0924-4a98-bb33-cacc55211685"
+      ],
+      "created_at": "2026-10-06T05:40:23.001058Z"
+    },
+    "version": 2,
+    "supersedes_memory_id": null,
+    "created_at": "2026-10-06T05:40:30.794247Z",
+    "updated_at": "2026-10-06T05:40:30.794274Z",
+    "metadata": {
+      "source_history": [
+        {
+          "thread_id": "thread_003",
+          "message_ids": [
+            "375dcfe9-34a0-48cb-8cc2-9037dda0e208"
+          ]
+        },
+        {
+          "thread_id": "thread_003",
+          "message_ids": [
+            "614e3cdc-0924-4a98-bb33-cacc55211685"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "memory_id": "8bf235e5-9b6f-4187-9627-160795cf2e34",
+    "user_id": "user_001",
+    "memory_type": "goal",
+    "content": "User's travel dates: Oct 17\u201319 (no year specified).",
+    "status": "active",
+    "source": {
+      "thread_id": "thread_004",
+      "message_ids": [
+        "f5f61a15-d6e0-41e1-a97b-03842ede68b9"
+      ],
+      "created_at": "2026-10-06T05:56:39.517453Z"
+    },
+    "version": 2,
+    "supersedes_memory_id": null,
+    "created_at": "2026-10-06T05:53:19.235754Z",
+    "updated_at": "2026-10-06T05:56:48.783378Z",
+    "metadata": {}
+  },
+  {
+    "memory_id": "297dc2a1-87b9-4daa-a43a-249c740c096b",
+    "user_id": "user_001",
+    "memory_type": "fact",
+    "content": "User is planning to watch a movie at a theatre with their friends. Planning to watch any latest released movie. Mentioned 'Saturday' (may indicate availability or a day-specific request). User mentioned 'oct17-19' (likely referring to dates Oct 17 to Oct 19), purpose unspecified.",
+    "status": "active",
+    "source": {
+      "thread_id": "thread_004",
+      "message_ids": [
+        "c2f4d181-59bb-480a-a369-defd90a3c977"
+      ],
+      "created_at": "2026-10-06T05:55:30.354877Z"
+    },
+    "version": 4,
+    "supersedes_memory_id": null,
+    "created_at": "2026-10-06T05:55:36.456709Z",
+    "updated_at": "2026-10-06T05:55:36.456736Z",
+    "metadata": {
+      "source_history": [
+        {
+          "thread_id": "thread_003",
+          "message_ids": [
+            "014460e8-9903-447d-bbd1-2419c4ac0d6b"
+          ]
+        },
+        {
+          "thread_id": "thread_003",
+          "message_ids": [
+            "988f0999-93a4-4319-ac49-fe9ee6734b7e"
+          ]
+        },
+        {
+          "thread_id": "thread_003",
+          "message_ids": [
+            "cd7fa66a-ecd7-45bb-a6a3-f8200fb11cb4"
+          ]
+        },
+        {
+          "thread_id": "thread_004",
+          "message_ids": [
+            "c2f4d181-59bb-480a-a369-defd90a3c977"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "memory_id": "3fe267d3-9965-4162-934f-500b33165b2b",
+    "user_id": "user_001",
+    "memory_type": "fact",
+    "content": "User's destination is Chikmagalur.",
+    "status": "active",
+    "source": {
+      "thread_id": "thread_004",
+      "message_ids": [
+        "736c5d7a-c87b-45cb-bc53-961b4e8d82c7"
+      ],
+      "created_at": "2026-10-06T05:58:14.023170Z"
+    },
+    "version": 1,
+    "supersedes_memory_id": null,
+    "created_at": "2026-10-06T05:58:19.200258Z",
+    "updated_at": "2026-10-06T05:58:19.200285Z",
+    "metadata": {}
   }
 ]

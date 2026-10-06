@@ -7,7 +7,8 @@ from langgraph.types import Send
 
 from app.contracts.context import AgentContext
 from app.contracts.retrieval import MergedRetrievalResult
-from app.contracts.runtime import AgentRequest, AgentResponse
+from app.contracts.retrieval import RetrievedItem
+from app.contracts.runtime import AgentRequest, AgentResponse, ConversationStore
 from app.contracts.tracing import GraphTrace, RetrievalTrace
 from app.graph.nodes.answer import (
     AnswerEvidenceValidator,
@@ -20,7 +21,12 @@ from app.graph.nodes.retrieval import LTMNode, PDFNode, STMNode
 from app.graph.schemas import AnswerDraft, resolve_calendar_day
 from app.graph.state import GraphState
 from app.llm.provider import LLMProvider
+<<<<<<< Updated upstream
 from app.rag.reranker import ReciprocalRankFusionReranker, Reranker
+=======
+from app.graph.reranker import ReciprocalRankFusionReranker, Reranker
+from app.memory.stm.context_budget import STMContextBudget
+>>>>>>> Stashed changes
 from app.observability.tracker import ObservabilityTracker
 from app.tracing.tracer import TraceSink
 
@@ -51,6 +57,7 @@ class RetrievalPipeline:
         llm: LLMProvider,
         stm_retriever: Any | None = None,
         episodic_retriever: Any | None = None,
+        conversation_store: ConversationStore | None = None,
         ltm_retriever: Any | None = None,
         pdf_retriever: Any | None = None,
         reranker: Reranker | None = None,
@@ -74,9 +81,12 @@ class RetrievalPipeline:
         self.answer_validator = AnswerEvidenceValidator(llm)
         self.query_rewriter = QueryRewriter(llm)
         self.max_retries = max_retries
+        self.conversation_store = conversation_store
         self.stm_node = STMNode(
             stm_retriever=stm_retriever,
             episodic_retriever=episodic_retriever,
+            conversation_store=conversation_store,
+            context_budget=STMContextBudget(max_tokens=max_context_tokens),
             top_k=stm_top_k,
             recency_weight=recency_weight,
             tracker=self.tracker,
@@ -163,6 +173,10 @@ class RetrievalPipeline:
                 "thread_id": thread_id,
                 "query": query,
                 "document_ids": document_ids or [],
+                "recent_items": self._recent_thread_items(
+                    user_id=user_id,
+                    thread_id=thread_id,
+                ),
                 "trace_id": trace_id or "",
                 "retry_count": 0,
             }
@@ -339,7 +353,17 @@ class RetrievalPipeline:
             for source in ("stm", "ltm", "pdf")
             if state.get(f"{source}_error") is not None
         }
-        items = [item for result in results for item in result.items]
+        recent_items = state.get("recent_items", [])
+        seen_item_ids = {item.item_id for item in recent_items}
+        items = [
+            *recent_items,
+            *[
+                item
+                for result in results
+                for item in result.items
+                if item.item_id not in seen_item_ids
+            ],
+        ]
         return {
             "retrieval_errors": retrieval_errors,
             "merged_results": MergedRetrievalResult(
@@ -419,9 +443,8 @@ class RetrievalPipeline:
     def _rewrite_query(self, state: GraphState) -> dict[str, Any]:
         with self.tracker.track_latency("query_rewriting"):
             validation = state.get("validation", {})
-            query = state.get("rewritten_query") or state["query"]
             rewritten_query = self.query_rewriter.rewrite(
-                query=query,
+                query=state["query"],
                 reason=validation.get("reason"),
             )
             return {
@@ -440,6 +463,36 @@ class RetrievalPipeline:
                 "retry_exhausted": True,
             },
         }
+
+    def _recent_thread_items(
+        self,
+        *,
+        user_id: str,
+        thread_id: str,
+        limit: int = 8,
+    ) -> list[RetrievedItem]:
+        if self.conversation_store is None:
+            return []
+
+        conversation = self.conversation_store.load(user_id, thread_id)
+        recent_messages = conversation.messages[-limit:]
+        return [
+            RetrievedItem(
+                item_id=message.message_id,
+                source="stm",
+                content=message.content,
+                score=None,
+                rank=index,
+                metadata={
+                    "user_id": user_id,
+                    "thread_id": thread_id,
+                    "role": message.role,
+                    "timestamp": message.timestamp.isoformat(),
+                    "context_type": "recent",
+                },
+            )
+            for index, message in enumerate(recent_messages, start=1)
+        ]
 
     @staticmethod
     def _insufficient_evidence_answer() -> str:

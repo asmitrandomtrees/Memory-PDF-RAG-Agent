@@ -19,6 +19,28 @@ class PlainFallbackLLM:
         return LLMResponse(content="We were designing the authentication endpoint.")
 
 
+class PromptCaptureLLM:
+    def __init__(self) -> None:
+        self.messages = None
+
+    def structured_output(self, messages, output_schema, *, temperature=None):
+        self.messages = messages
+        return AnswerDraft(answer="Saturday works for a Hindi thriller.")
+
+
+def test_answer_prompt_limits_follow_up_questions_and_option_menus() -> None:
+    llm = PromptCaptureLLM()
+
+    AnswerGenerator(llm).generate(
+        query="Saturday, Hindi",
+        context=AgentContext(),
+    )
+
+    system_prompt = llm.messages[0].content
+    assert "Ask at most one follow-up question" in system_prompt
+    assert "Do not end routine replies with menus" in system_prompt
+
+
 def test_answer_generator_falls_back_to_plain_chat_for_invalid_tool_output() -> None:
     llm = PlainFallbackLLM()
 
