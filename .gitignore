@@ -79,9 +79,3 @@ tempCodeRunnerFile.py
 
 # Runtime / generated data
 data/*
-
-# Keep the directory structure
-!data/**/
-
-# Keep .gitkeep files
-!data/**/.gitkeep
