@@ -11,30 +11,10 @@ class JsonlConversationStore:
         self.root_path.mkdir(parents=True, exist_ok=True)
 
     def _conversation_path(self, user_id: str, thread_id: str) -> Path:
-        invalid_characters = ("/", "\\", ":", "\0")
-        if (
-            not user_id
-            or user_id in {".", ".."}
-            or any(character in user_id for character in invalid_characters)
-            or not thread_id
-            or thread_id in {".", ".."}
-            or any(character in thread_id for character in invalid_characters)
-        ):
-            raise ConversationStoreError(
-                "user_id and thread_id must be safe path components"
-            )
-
-        root = self.root_path.resolve()
-        user_directory = (root / user_id).resolve()
-        if user_directory.parent != root:
-            raise ConversationStoreError("Invalid user_id path")
-
-        path = (user_directory / f"{thread_id}.jsonl").resolve()
-        if path.parent != user_directory:
-            raise ConversationStoreError("Invalid thread_id path")
-
+        user_directory = self.root_path / user_id
         user_directory.mkdir(parents=True, exist_ok=True)
-        return path
+
+        return user_directory / f"{thread_id}.jsonl"
 
     def load(self, user_id: str, thread_id: str) -> Conversation:
         path = self._conversation_path(user_id, thread_id)

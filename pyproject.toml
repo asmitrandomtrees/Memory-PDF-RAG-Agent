@@ -9,7 +9,6 @@ description = "Production-oriented conversational AI system with STM, LTM, PDF R
 requires-python = ">=3.11"
 dependencies = [
     "langchain-core>=0.3.0",
-    "langchain-openai>=0.3.0",
     "langgraph>=0.2.0",
     "pydantic>=2.7.0",
     "pydantic-settings>=2.2.0",
@@ -18,10 +17,11 @@ dependencies = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --import-mode=importlib"
+addopts = "-v"
 
 [tool.setuptools.packages.find]
 include = ["app*"]

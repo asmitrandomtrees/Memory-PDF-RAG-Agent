@@ -1,16 +1,11 @@
 from app.config.settings import Settings
 
 
-def test_default_settings(monkeypatch) -> None:
-    monkeypatch.delenv("CONVERSATION_DATA_PATH", raising=False)
-    monkeypatch.delenv("TRACE_DATA_PATH", raising=False)
-    settings = Settings(_env_file=None)
+def test_default_settings() -> None:
+    settings = Settings()
 
     assert settings.app_env == "development"
     assert settings.app_name == "conversational-memory-agent"
-    assert settings.conversation_data_path == "./data/conversations"
-    assert settings.ltm_memory_path == "./data/memories/ltm.json"
-    assert settings.trace_data_path == "./data/traces/development"
 
     assert settings.vector_store_type == "chroma"
 

@@ -1,5 +1,5 @@
 from app.contracts.retrieval import RetrievedItem
-from app.graph.reranker import Reranker
+from app.rag.reranker import Reranker
 
 
 class FakeReranker:

@@ -28,20 +28,15 @@ class ChromaVectorStore:
         if not filters:
             return None
 
-        clauses: list[dict[str, Any]] = []
-        for key, value in filters.items():
-            if isinstance(value, dict) and len(value) > 1:
-                clauses.extend(
-                    {key: {operator: operand}}
-                    for operator, operand in value.items()
-                )
-            else:
-                clauses.append({key: value})
+        if len(filters) == 1:
+            return filters
 
-        if len(clauses) == 1:
-            return clauses[0]
-
-        return {"$and": clauses}
+        return {
+            "$and": [
+                {key: value}
+                for key, value in filters.items()
+            ]
+        }
 
     def add(
         self,
@@ -162,34 +157,3 @@ class ChromaVectorStore:
             raise VectorStoreError(
                 f"Failed to delete items from {collection}"
             ) from exc
-
-    def get_by_metadata(
-        self,
-        *,
-        collection: str,
-        filters: dict[str, Any],
-    ) -> list[RetrievedItem]:
-        try:
-            result = self._collection(collection).get(
-                where=self._build_where(filters),
-                include=["documents", "metadatas"],
-            )
-        except Exception as exc:
-            raise VectorStoreError(
-                f"Failed to get items from {collection}"
-            ) from exc
-
-        ids = result.get("ids", [])
-        documents = result.get("documents") or []
-        metadatas = result.get("metadatas") or []
-
-        return [
-            RetrievedItem(
-                item_id=item_id,
-                source=(metadatas[index] or {}).get("source", collection),
-                content=documents[index] or "",
-                rank=index + 1,
-                metadata=metadatas[index] or {},
-            )
-            for index, item_id in enumerate(ids)
-        ]
