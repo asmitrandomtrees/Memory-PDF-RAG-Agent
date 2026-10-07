@@ -121,13 +121,14 @@ def _allowed_citation_ids(context: AgentContext) -> set[str]:
     allowed: set[str] = set()
     for item in context.items:
         allowed.add(item.item_id)
-        source_ids = item.metadata.get("source_item_ids", [])
-        if isinstance(source_ids, list):
-            allowed.update(
-                source_id
-                for source_id in source_ids
-                if isinstance(source_id, str)
-            )
+        for metadata_key in ("source_item_ids", "source_message_ids"):
+            source_ids = item.metadata.get(metadata_key, [])
+            if isinstance(source_ids, list):
+                allowed.update(
+                    source_id
+                    for source_id in source_ids
+                    if isinstance(source_id, str)
+                )
     return allowed
 
 

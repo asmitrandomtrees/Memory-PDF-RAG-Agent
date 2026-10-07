@@ -4,17 +4,18 @@ from app.contracts.runtime import (
     AgentRequest,
 )
 from app.contracts.retrieval import RetrievedItem
+from app.contracts.routing import RetrievalPlan
+from app.config.settings import Settings
 from app.graph.graph import Phase0Graph
 from app.graph.schemas import AnswerDraft, AnswerValidation, QueryAnalysis
-from app.contracts.routing import RetrievalPlan
 from app.memory.ltm.schemas import LTMExtractionOutput
+from app.memory.stm.summarizer import STMContextSummarizer
 from app.rag.pdf_retriever import PDFRetriever
 from app.runtime.agent import AgentRuntime
 from app.runtime.conversation_store import (
     JsonlConversationStore,
 )
 from app.runtime.factory import create_runtime
-from app.config.settings import Settings
 
 
 def test_runtime_executes_phase0_graph(
@@ -174,6 +175,7 @@ def test_runtime_executes_stm_ltm_graph_and_persists_messages(tmp_path) -> None:
         conversation_store=conversation_store,
     )
     assert isinstance(runtime.graph.pdf_node.retriever, PDFRetriever)
+    assert isinstance(runtime.graph.stm_node.summarizer, STMContextSummarizer)
 
     response = runtime.handle(
         AgentRequest(

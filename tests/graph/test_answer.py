@@ -93,3 +93,28 @@ def test_validator_keeps_answer_available_when_model_validation_fails() -> None:
 
     assert validation.is_valid is True
     assert "unavailable" in (validation.reason or "")
+
+
+def test_validator_accepts_original_ids_referenced_by_stm_summary() -> None:
+    context = AgentContext(
+        items=[
+            ContextItem(
+                source="stm",
+                item_id="stm_summary",
+                content="We discussed authentication.",
+                metadata={"source_item_ids": ["message_1"]},
+            )
+        ]
+    )
+
+    validation = AnswerEvidenceValidator(PlainFallbackLLM()).validate(
+        query="What did we discuss?",
+        draft=AnswerDraft(
+            answer="We discussed authentication.",
+            cited_item_ids=["message_1"],
+        ),
+        context=context,
+    )
+
+    assert validation.is_valid is True
+    assert validation.needs_retrieval is False

@@ -23,6 +23,7 @@ from app.graph.state import GraphState
 from app.llm.provider import LLMProvider
 from app.graph.reranker import ReciprocalRankFusionReranker, Reranker
 from app.memory.stm.context_budget import STMContextBudget
+from app.memory.stm.summarizer import STMContextSummarizer
 from app.observability.tracker import ObservabilityTracker
 from app.tracing.tracer import TraceSink
 
@@ -83,6 +84,7 @@ class RetrievalPipeline:
             episodic_retriever=episodic_retriever,
             conversation_store=conversation_store,
             context_budget=STMContextBudget(max_tokens=max_context_tokens),
+            summarizer=STMContextSummarizer(llm=llm),
             top_k=stm_top_k,
             recency_weight=recency_weight,
             tracker=self.tracker,

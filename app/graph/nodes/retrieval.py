@@ -10,6 +10,7 @@ from app.contracts.runtime import ConversationStore
 from app.graph.state import GraphState
 from app.memory.stm.context import STMContextExpander
 from app.memory.stm.context_budget import STMContextBudget
+from app.memory.stm.summarizer import STMContextSummarizer
 from app.observability.tracker import ObservabilityTracker
 
 
@@ -22,6 +23,7 @@ class STMNode:
         conversation_store: ConversationStore | None = None,
         context_expander: STMContextExpander | None = None,
         context_budget: STMContextBudget | None = None,
+        summarizer: STMContextSummarizer | None = None,
         top_k: int = 5,
         recency_weight: float = 0.5,
         tracker: ObservabilityTracker | None = None,
@@ -34,6 +36,7 @@ class STMNode:
             recent_message_count=6,
         )
         self.context_budget = context_budget
+        self.summarizer = summarizer
         self.top_k = top_k
         self.recency_weight = recency_weight
         self.tracker = tracker or ObservabilityTracker()
@@ -105,8 +108,106 @@ class STMNode:
             ],
             *items,
         ]
+        context_processing: dict[str, Any] = {
+            "max_tokens": (
+                self.context_budget.max_tokens
+                if self.context_budget is not None
+                else None
+            ),
+            "input_item_count": len(items),
+            "input_estimated_tokens": (
+                sum(
+                    self.context_budget.estimate_tokens(item.content)
+                    for item in items
+                )
+                if self.context_budget is not None
+                else None
+            ),
+            "summary_attempted": False,
+            "summary_added": False,
+            "summary_source_count": 0,
+            "summary_estimated_tokens": 0,
+        }
         if self.context_budget is not None:
-            items = self.context_budget.select(items)
+            selected_items = self.context_budget.select(items)
+            full_budget_selection = selected_items
+            selected_ids = {
+                item.item_id
+                for item in selected_items
+            }
+            omitted_items = [
+                item
+                for item in items
+                if item.item_id not in selected_ids
+            ]
+            context_processing["overflow"] = bool(omitted_items)
+            context_processing["selected_verbatim_count"] = len(selected_items)
+            context_processing["omitted_item_count"] = len(omitted_items)
+            if omitted_items and self.summarizer is not None:
+                total_tokens = sum(
+                    self.context_budget.estimate_tokens(item.content)
+                    for item in items
+                )
+                max_tokens = self.context_budget.max_tokens
+                summary_reserve = max(1, max_tokens // 4)
+                if total_tokens > max_tokens and summary_reserve < max_tokens:
+                    raw_budget = STMContextBudget(
+                        max_tokens=max_tokens - summary_reserve,
+                        chars_per_token=self.context_budget.chars_per_token,
+                    )
+                    selected_items = raw_budget.select(items)
+                    selected_ids = {
+                        item.item_id
+                        for item in selected_items
+                    }
+                    omitted_items = [
+                        item
+                        for item in items
+                        if item.item_id not in selected_ids
+                    ]
+                    context_processing["summary_attempted"] = True
+                    context_processing["selected_verbatim_count"] = len(
+                        selected_items
+                    )
+                    context_processing["omitted_item_count"] = len(
+                        omitted_items
+                    )
+                    try:
+                        summary = self.summarizer.summarize(
+                            omitted_items,
+                            max_tokens=summary_reserve,
+                        )
+                    except Exception as exc:
+                        context_processing["summary_error"] = str(exc)
+                        summary = None
+                    if summary is not None:
+                        selected_tokens = sum(
+                            self.context_budget.estimate_tokens(item.content)
+                            for item in selected_items
+                        )
+                        summary_tokens = self.context_budget.estimate_tokens(
+                            summary.content
+                        )
+                        context_processing["summary_source_count"] = len(
+                            summary.metadata.get("source_item_ids", [])
+                        )
+                        context_processing["summary_estimated_tokens"] = (
+                            summary_tokens
+                        )
+                        if selected_tokens + summary_tokens <= max_tokens:
+                            selected_items.append(summary)
+                            context_processing["summary_added"] = True
+                        else:
+                            selected_items = full_budget_selection
+                    else:
+                        selected_items = full_budget_selection
+                else:
+                    selected_items = full_budget_selection
+            items = selected_items
+            context_processing["output_estimated_tokens"] = sum(
+                self.context_budget.estimate_tokens(item.content)
+                for item in items
+            )
 
         ranked_items = [
             item.model_copy(update={"rank": rank})
@@ -120,6 +221,7 @@ class STMNode:
                     **result.metadata,
                     "expanded_with_recent_messages": True,
                     "raw_retrieved_count": len(result.items),
+                    "context_processing": context_processing,
                 },
             }
         )

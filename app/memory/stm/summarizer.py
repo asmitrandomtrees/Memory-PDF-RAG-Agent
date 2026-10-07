@@ -13,6 +13,8 @@ class STMContextSummarizer:
     def summarize(
         self,
         items: list[RetrievedItem],
+        *,
+        max_tokens: int | None = None,
     ) -> RetrievedItem | None:
         if not items:
             return None
@@ -30,18 +32,24 @@ class STMContextSummarizer:
         if not content.strip():
             return None
 
+        system_prompt = (
+            "Summarize the conversation context concisely. "
+            "Preserve important facts, decisions, requirements, "
+            "questions, and unresolved points. Do not invent "
+            "information. Return only the summary."
+        )
+        if max_tokens is not None:
+            system_prompt += (
+                f" Keep the summary to at most approximately "
+                f"{max_tokens} tokens."
+            )
+
         try:
             response = self.llm.invoke(
                 [
                     ChatMessage(
                         role="system",
-                        content=(
-                            "Summarize the conversation context "
-                            "concisely. Preserve important facts, "
-                            "decisions, requirements, questions, "
-                            "and unresolved points. Do not invent "
-                            "information. Return only the summary."
-                        ),
+                        content=system_prompt,
                     ),
                     ChatMessage(role="user", content=content),
                 ],
@@ -70,6 +78,7 @@ class STMContextSummarizer:
             metadata={
                 "context_type": "summary",
                 "source_message_ids": source_ids,
+                "source_item_ids": source_ids,
             },
         )
 

@@ -86,11 +86,20 @@ class TextTraceExporter:
         if not isinstance(value, dict):
             return f"  {name}: not used"
         item_ids = value.get("retrieved_ids", [])
-        return (
+        lines = [
             f"  {name}: {len(item_ids)} item(s); "
             f"ids={TextTraceExporter._format_value(item_ids)}; "
             f"latency_ms={value.get('latency_ms')}"
-        )
+        ]
+        metadata = value.get("metadata", {})
+        if name == "STM" and isinstance(metadata, dict):
+            processing = metadata.get("context_processing")
+            if isinstance(processing, dict):
+                lines.append(
+                    "  STM context: "
+                    f"{TextTraceExporter._inline_mapping(processing)}"
+                )
+        return "\n".join(lines)
 
     @staticmethod
     def _inline_mapping(value: object) -> str:

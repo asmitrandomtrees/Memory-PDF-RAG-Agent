@@ -19,6 +19,15 @@ def test_text_trace_exporter_writes_readable_graph_trace(tmp_path) -> None:
             query="What did we discuss about authentication?",
             retrieved_ids=["message_1"],
             latency_ms=12.5,
+            metadata={
+                "context_processing": {
+                    "overflow": True,
+                    "summary_attempted": True,
+                    "summary_added": True,
+                    "summary_source_count": 4,
+                    "summary_estimated_tokens": 50,
+                }
+            },
         ),
         reranker={"input_count": 1, "output_count": 1},
         context={"item_count": 1, "estimated_tokens": 8},
@@ -33,6 +42,9 @@ def test_text_trace_exporter_writes_readable_graph_trace(tmp_path) -> None:
     assert "Trace: trace_123" in text
     assert "Query: What did we discuss about authentication?" in text
     assert "STM: 1 item(s); ids=[\"message_1\"]" in text
+    assert "STM context:" in text
+    assert "summary_attempted=True" in text
+    assert "summary_source_count=4" in text
     assert "LTM: not used" in text
     assert "use_stm: True" in text
     assert "retry_count=0" in text
