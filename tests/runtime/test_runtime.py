@@ -194,6 +194,11 @@ def test_runtime_executes_stm_ltm_graph_and_persists_messages(tmp_path) -> None:
         "user",
         "assistant",
     ]
+    assert conversation.messages[1].metadata["trace_id"] == response.trace_id
+    assert (
+        conversation.messages[1].metadata["citations"]
+        == response.metadata["citations"]
+    )
     assert all(
         message.message_id in vector_store.items
         for message in conversation.messages

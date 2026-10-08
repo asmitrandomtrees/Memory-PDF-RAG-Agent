@@ -72,6 +72,37 @@ class JsonlConversationStore:
             messages=messages,
         )
 
+    def list_threads(self, user_id: str) -> list[Conversation]:
+        invalid_characters = ("/", "\\", ":", "\0")
+        if (
+            not user_id
+            or user_id in {".", ".."}
+            or any(character in user_id for character in invalid_characters)
+        ):
+            raise ConversationStoreError("user_id must be a safe path component")
+
+        root = self.root_path.resolve()
+        user_directory = (root / user_id).resolve()
+        if user_directory.parent != root:
+            raise ConversationStoreError("Invalid user_id path")
+        if not user_directory.is_dir():
+            return []
+
+        conversations = [
+            self.load(user_id, path.stem)
+            for path in user_directory.glob("*.jsonl")
+            if path.is_file() and path.resolve().parent == user_directory
+        ]
+        conversations.sort(
+            key=lambda conversation: (
+                conversation.messages[-1].timestamp
+                if conversation.messages
+                else conversation.updated_at
+            ),
+            reverse=True,
+        )
+        return conversations
+
     def append_message(self, message: ConversationMessage) -> None:
         path = self._conversation_path(
             message.user_id,

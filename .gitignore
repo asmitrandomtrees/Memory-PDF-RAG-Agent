@@ -79,3 +79,10 @@ tempCodeRunnerFile.py
 
 # Runtime / generated data
 data/*
+
+# Node.js dependencies
+node_modules/
+
+# Frontend test and tool output
+frontend/coverage/
+frontend/.vite/

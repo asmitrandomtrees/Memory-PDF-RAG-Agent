@@ -29,3 +29,41 @@ Or:
 ```bash
 python run.py --user user_001 --thread thread_001 --query "Hello"
 ```
+
+## Web Application
+
+The local web app provides a FastAPI backend and a React chat interface for
+conversations and PDF RAG. Configure the existing `.env` settings first,
+including the model credentials required by your configured LLM provider.
+
+Start the API from the repository root:
+
+```bash
+python -m uvicorn app.api:app --host 127.0.0.1 --port 8000
+```
+
+In a second terminal, start the frontend development server:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://127.0.0.1:5173`. The Vite development server proxies API requests
+to the backend on port 8000.
+
+To serve the built frontend from FastAPI instead, build it and start the API:
+
+```bash
+cd frontend
+npm install
+npm run build
+cd ..
+python -m uvicorn app.api:app --host 127.0.0.1 --port 8000
+```
+
+Then open `http://127.0.0.1:8000`. The API has no authentication and is intended
+for local use only; keep it bound to `127.0.0.1` and do not expose it publicly.
+PDFs uploaded through the web app are stored under `PDF_UPLOAD_PATH` and are
+limited by `MAX_PDF_UPLOAD_BYTES`.

@@ -67,7 +67,7 @@ class AgentRuntime:
             thread_id=session.thread_id,
             role="assistant",
             content=response.answer,
-            metadata={"trace_id": trace_id},
+            metadata={"trace_id": trace_id, **response.metadata},
         )
 
         self.conversation_store.append_message(assistant_message)

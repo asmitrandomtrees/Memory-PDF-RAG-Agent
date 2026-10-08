@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     stm_collection: str = Field("stm_collection", alias="STM_COLLECTION")
     ltm_collection: str = Field("ltm_collection", alias="LTM_COLLECTION")
     pdf_collection: str = Field("pdf_collection", alias="PDF_COLLECTION")
+    pdf_upload_path: str = Field("./data/uploads/pdfs", alias="PDF_UPLOAD_PATH")
+    max_pdf_upload_bytes: int = Field(
+        25 * 1024 * 1024,
+        alias="MAX_PDF_UPLOAD_BYTES",
+        ge=1,
+    )
 
     # Conversation store
     conversation_store_type: str = Field("jsonl", alias="CONVERSATION_STORE_TYPE")
