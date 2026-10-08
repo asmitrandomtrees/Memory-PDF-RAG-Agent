@@ -76,16 +76,20 @@ def create_app(
     *,
     services_factory: Callable[[], dict[str, Any]] = _build_services,
 ) -> FastAPI:
+
+    # create and reuse services for entire lifespan
     @asynccontextmanager
     async def lifespan(application: FastAPI):
         application.state.services = services_factory()
         yield
-
+    
     application = FastAPI(
         title="Memory PDF RAG Agent API",
         version="1.0.0",
         lifespan=lifespan,
     )
+
+    # CORS
     application.add_middleware(
         CORSMiddleware,
         allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -218,7 +222,7 @@ def create_app(
             with destination.open("xb") as saved_file:
                 saved_file.write(contents)
             chunks = await run_in_threadpool(
-                ingest_pdf,
+                ingest_pdf,          # ingest_pdf is synchronous/blocking so run_in_threadpool() doesn't block FastAPI's async event loop
                 destination,
                 services["embeddings"],
                 services["vector_store"],

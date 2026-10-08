@@ -16,8 +16,10 @@ import {
   X,
 } from "lucide-react";
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
+
 async function api(path, options = {}) {
-  const response = await fetch(path, options);
+  const response = await fetch(`${API_BASE_URL}${path}`, options);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const detail = typeof payload.detail === "string"
@@ -238,11 +240,11 @@ function App() {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-[292px] shrink-0 flex-col border-r border-[#e9eded] bg-white transition-transform lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-73 shrink-0 flex-col border-r border-[#e9eded] bg-white transition-transform lg:static lg:translate-x-0 ${
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex h-[76px] items-center justify-between border-b border-[#eef0f0] px-5">
+        <div className="flex h-19 items-center justify-between border-b border-[#eef0f0] px-5">
           <a href="/" className="flex items-center gap-3" aria-label="Memo home">
             <span className="grid size-10 place-items-center rounded-[14px] bg-[#d9f5ef] text-[#087d70]">
               <Sparkles size={20} strokeWidth={2.1} />
@@ -420,7 +422,7 @@ function App() {
       </aside>
 
       <main className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-[76px] shrink-0 items-center justify-between border-b border-[#e9eded] bg-white/85 px-4 backdrop-blur sm:px-7">
+        <header className="flex h-19 shrink-0 items-center justify-between border-b border-[#e9eded] bg-white/85 px-4 backdrop-blur sm:px-7">
           <div className="flex min-w-0 items-center gap-3">
             <button
               className="grid size-9 place-items-center rounded-lg text-[#667476] hover:bg-[#f3f6f6] lg:hidden"
@@ -516,7 +518,7 @@ function App() {
           )}
         </div>
 
-        <div className="shrink-0 bg-gradient-to-t from-[#f8f9fb] via-[#f8f9fb] to-transparent px-3 pb-3 pt-2 sm:px-6 sm:pb-6">
+        <div className="shrink-0 bg-linear-to-t from-[#f8f9fb] via-[#f8f9fb] to-transparent px-3 pb-3 pt-2 sm:px-6 sm:pb-6">
           <form
             onSubmit={submitMessage}
             className="mx-auto max-w-3xl rounded-[20px] border border-[#e3e9e8] bg-white p-2 shadow-[0_8px_30px_rgb(24_54_50_0.07)] transition focus-within:border-[#add8cf] focus-within:shadow-[0_8px_34px_rgb(24_100_85_0.10)]"
@@ -616,7 +618,7 @@ function Message({ message }) {
               : "rounded-tl-md border border-[#e9eeee] bg-white text-[#374345] shadow-[0_2px_8px_rgb(26_49_47_0.025)]"
           }`}
         >
-          <div className="message-content whitespace-pre-wrap break-words">
+          <div className="message-content whitespace-pre-wrap wrap-break-word">
             {message.content}
           </div>
         </div>
