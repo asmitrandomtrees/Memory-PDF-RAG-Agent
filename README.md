@@ -62,8 +62,3 @@ npm run build
 cd ..
 python -m uvicorn app.api:app --host 127.0.0.1 --port 8000
 ```
-
-Then open `http://127.0.0.1:8000`. The API has no authentication and is intended
-for local use only; keep it bound to `127.0.0.1` and do not expose it publicly.
-PDFs uploaded through the web app are stored under `PDF_UPLOAD_PATH` and are
-limited by `MAX_PDF_UPLOAD_BYTES`.
