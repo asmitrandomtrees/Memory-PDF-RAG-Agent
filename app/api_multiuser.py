@@ -13,16 +13,18 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from app.api import ChatRequest, DocumentSummary, PDF_SIGNATURE
+from app.api import (
+    ChatRequest,
+    DocumentSummary,
+    PDF_SIGNATURE,
+    _message_clears_source_policy,
+    _message_requests_pdf_only,
+)
 from app.config.settings import Settings, get_settings
 from app.config.instance_settings import settings_for_instance
 from app.contracts.runtime import AgentRequest
-from app.embeddings.factory import create_embedding_provider
-from app.rag.pdf_ingest import document_id_for, ingest_pdf
-from app.runtime.agent import AgentRuntime
 from app.runtime.conversation_store import JsonlConversationStore
-from app.runtime.factory import create_runtime
-from app.vectorstores.factory import create_vector_store
+from app.runtime.thread_state import JsonThreadStateStore, ThreadSourceState
 
 USER_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
@@ -158,6 +160,9 @@ class UserProfileStore:
 
 
 def _build_services() -> dict[str, Any]:
+    from app.embeddings.factory import create_embedding_provider
+    from app.vectorstores.factory import create_vector_store
+
     settings = settings_for_instance(get_settings(), "api_multiuser")
     embeddings = create_embedding_provider(settings)
     vector_store = create_vector_store(settings)
@@ -167,6 +172,10 @@ def _build_services() -> dict[str, Any]:
         / "user_profiles.sqlite3"
     )
     conversation_store = JsonlConversationStore(settings.conversation_data_path)
+    thread_state_store = JsonThreadStateStore(
+        Path(settings.conversation_data_path).resolve().parent
+        / "thread_state"
+    )
     upload_root = Path(settings.pdf_upload_path).resolve()
     upload_root.mkdir(parents=True, exist_ok=True)
     return {
@@ -174,6 +183,7 @@ def _build_services() -> dict[str, Any]:
         "embeddings": embeddings,
         "vector_store": vector_store,
         "conversation_store": conversation_store,
+        "thread_state_store": thread_state_store,
         "upload_root": upload_root,
         "user_store": user_store,
         "runtimes": {},
@@ -208,10 +218,68 @@ def _user_hash(user_id: str) -> str:
     return hashlib.sha256(user_id.encode("utf-8")).hexdigest()[:16]
 
 
+def _available_document_ids(
+    *,
+    services: dict[str, Any],
+    user_id: str,
+) -> list[str]:
+    directory: Path = services["upload_root"] / user_id
+    if not directory.is_dir():
+        return []
+
+    settings: Settings = services["settings"]
+    collection = _user_pdf_collection(settings.pdf_collection, user_id)
+    document_ids: list[str] = []
+    for path in sorted(directory.glob("*.pdf")):
+        metadata_items = services["vector_store"].get_by_metadata(
+            collection=collection,
+            filters={"source_path": str(path.resolve())},
+        )
+        if not metadata_items:
+            continue
+        document_id = metadata_items[0].metadata.get("document_id")
+        if isinstance(document_id, str) and document_id not in document_ids:
+            document_ids.append(document_id)
+    return document_ids
+
+
+def _resolve_thread_source_state(
+    *,
+    services: dict[str, Any],
+    user_id: str,
+    thread_id: str,
+    message: str,
+    requested_document_ids: list[str],
+) -> ThreadSourceState:
+    store: JsonThreadStateStore = services["thread_state_store"]
+    state = store.load(user_id, thread_id)
+
+    if _message_clears_source_policy(message):
+        state = ThreadSourceState()
+        store.save(user_id, thread_id, state)
+        return state
+
+    if requested_document_ids:
+        state.document_ids = requested_document_ids
+
+    if _message_requests_pdf_only(message):
+        state.source_policy = "pdf_only"
+        if not state.document_ids:
+            state.document_ids = _available_document_ids(
+                services=services,
+                user_id=user_id,
+            )
+
+    if state.source_policy == "pdf_only":
+        store.save(user_id, thread_id, state)
+
+    return state
+
+
 def create_app(
     *,
     services_factory: Callable[[], dict[str, Any]] = _build_services,
-    runtime_factory: Callable[..., AgentRuntime] = create_runtime,
+    runtime_factory: Callable[..., Any] | None = None,
 ) -> FastAPI:
 
     @asynccontextmanager
@@ -226,9 +294,14 @@ def create_app(
         lifespan=lifespan,
     )
 
-    def get_runtime(user_id: str) -> AgentRuntime:
+    def get_runtime(user_id: str) -> Any:
+        nonlocal runtime_factory
+        if runtime_factory is None:
+            from app.runtime.factory import create_runtime
+
+            runtime_factory = create_runtime
         services = application.state.services
-        runtimes: dict[str, AgentRuntime] = services["runtimes"]
+        runtimes: dict[str, Any] = services["runtimes"]
         if user_id not in runtimes:
             settings: Settings = services["settings"]
             user_hash = _user_hash(user_id)
@@ -398,12 +471,24 @@ def create_app(
             raise HTTPException(status_code=404, detail="Thread not found")
         if not body.message.strip():
             raise HTTPException(status_code=422, detail="Message cannot be blank")
+        services = application.state.services
+        thread_state = _resolve_thread_source_state(
+            services=services,
+            user_id=user_id,
+            thread_id=thread_id,
+            message=body.message.strip(),
+            requested_document_ids=body.document_ids,
+        )
+        document_ids = body.document_ids or thread_state.document_ids
         response = get_runtime(user_id).handle(
             AgentRequest(
                 user_id=user_id,
                 thread_id=thread_id,
                 message=body.message.strip(),
-                metadata={"document_ids": body.document_ids},
+                metadata={
+                    "document_ids": document_ids,
+                    "source_policy": thread_state.source_policy,
+                },
             )
         )
         return response.model_dump(mode="json")
@@ -446,6 +531,8 @@ def create_app(
         user_id: str,
         file: Annotated[UploadFile, File()],
     ) -> DocumentSummary:
+        from app.rag.pdf_ingest import document_id_for, ingest_pdf
+
         user_id = require_user(user_id)
         services = application.state.services
         settings: Settings = services["settings"]
@@ -501,6 +588,8 @@ def create_app(
 
     @application.delete("/api/users/{user_id}/documents/{document_id}")
     def delete_document(user_id: str, document_id: str) -> dict[str, str]:
+        from app.rag.pdf_ingest import document_id_for
+
         user_id = require_user(user_id)
         services = application.state.services
         settings: Settings = services["settings"]

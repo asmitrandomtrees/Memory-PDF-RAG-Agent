@@ -1,3 +1,5 @@
+import re
+
 from langchain_core.prompts import ChatPromptTemplate
 
 from app.contracts.conversation import Conversation, ConversationMessage
@@ -21,6 +23,55 @@ _EXTRACTION_PROMPT = ChatPromptTemplate.from_messages(
         ),
         ("human", "{conversation_text}"),
     ]
+)
+
+
+_MAX_RULE_VALUE_CHARS = 160
+_MAX_RULE_VALUE_WORDS = 24
+
+_MY_FIELD_RE = re.compile(
+    r"^(?:just\s+)?my\s+(?P<field>[a-z][a-z0-9 _-]{1,40})\s+"
+    r"(?:is|=)\s+(?P<value>.+)$",
+    re.IGNORECASE,
+)
+_I_AM_RE = re.compile(
+    r"^(?:i am|i'm)\s+(?P<value>.+)$",
+    re.IGNORECASE,
+)
+_PREFERENCE_RE = re.compile(
+    r"^(?:i\s+)?(?P<verb>prefer|like|love|dislike|hate)\s+"
+    r"(?P<value>.+)$",
+    re.IGNORECASE,
+)
+_NEGATIVE_PREFERENCE_RE = re.compile(
+    r"^(?:i\s+)?(?:do not|don't)\s+(?:like|prefer)\s+"
+    r"(?P<value>.+)$",
+    re.IGNORECASE,
+)
+_REMEMBER_RE = re.compile(
+    r"^remember(?:\s+that)?\s+(?P<value>.+)$",
+    re.IGNORECASE,
+)
+
+_TRANSIENT_I_AM_PREFIXES = (
+    "asking",
+    "building",
+    "checking",
+    "creating",
+    "debugging",
+    "doing",
+    "exploring",
+    "fixing",
+    "implementing",
+    "learning",
+    "looking",
+    "making",
+    "reading",
+    "testing",
+    "trying",
+    "using",
+    "working",
+    "writing",
 )
 
 
@@ -67,8 +118,16 @@ class LTMExtractor:
         if all(self._is_trivial_user_message(message) for message in messages):
             return []
 
+        rule_candidates, uncovered_messages = self._extract_rule_based(
+            conversation=conversation,
+            messages=messages,
+        )
+
+        if not uncovered_messages:
+            return rule_candidates
+
         conversation_text = self._build_conversation_text(
-            messages
+            uncovered_messages
         )
 
         output = self.llm.structured_output(
@@ -80,9 +139,256 @@ class LTMExtractor:
             temperature=0.0,
         )
 
-        return self._to_candidates(
+        llm_candidates = self._to_candidates(
             output=output,
             conversation=conversation,
+        )
+
+        uncovered_message_ids = {
+            message.message_id for message in uncovered_messages
+        }
+        llm_candidates = [
+            candidate
+            for candidate in llm_candidates
+            if set(candidate.source.message_ids).issubset(
+                uncovered_message_ids
+            )
+        ]
+
+        return rule_candidates + llm_candidates
+
+    @classmethod
+    def _extract_rule_based(
+        cls,
+        *,
+        conversation: Conversation,
+        messages: list[ConversationMessage],
+    ) -> tuple[list[CandidateMemory], list[ConversationMessage]]:
+        candidates: list[CandidateMemory] = []
+        uncovered_messages: list[ConversationMessage] = []
+
+        for message in messages:
+            candidate = cls._extract_rule_based_message(
+                conversation=conversation,
+                message=message,
+            )
+            if candidate is None:
+                uncovered_messages.append(message)
+                continue
+            candidates.append(candidate)
+
+        return candidates, uncovered_messages
+
+    @classmethod
+    def _extract_rule_based_message(
+        cls,
+        *,
+        conversation: Conversation,
+        message: ConversationMessage,
+    ) -> CandidateMemory | None:
+        content = message.content.strip()
+        normalized = " ".join(content.split())
+
+        if (
+            not normalized
+            or normalized.endswith("?")
+            or cls._is_trivial_user_message(message)
+        ):
+            return None
+
+        candidate = cls._extract_preference(
+            conversation=conversation,
+            message=message,
+            content=normalized,
+        )
+        if candidate is not None:
+            return candidate
+
+        candidate = cls._extract_profile_field(
+            conversation=conversation,
+            message=message,
+            content=normalized,
+        )
+        if candidate is not None:
+            return candidate
+
+        candidate = cls._extract_i_am_profile(
+            conversation=conversation,
+            message=message,
+            content=normalized,
+        )
+        if candidate is not None:
+            return candidate
+
+        return cls._extract_remember_instruction(
+            conversation=conversation,
+            message=message,
+            content=normalized,
+        )
+
+    @classmethod
+    def _extract_preference(
+        cls,
+        *,
+        conversation: Conversation,
+        message: ConversationMessage,
+        content: str,
+    ) -> CandidateMemory | None:
+        negative_match = _NEGATIVE_PREFERENCE_RE.match(content)
+        if negative_match:
+            value = cls._clean_rule_value(negative_match.group("value"))
+            if value is None:
+                return None
+            return cls._candidate(
+                conversation=conversation,
+                message=message,
+                memory_type="preference",
+                content=f"User does not like {value}.",
+                confidence=0.95,
+                metadata={"extraction_method": "rule_based"},
+            )
+
+        match = _PREFERENCE_RE.match(content)
+        if not match:
+            return None
+
+        value = cls._clean_rule_value(match.group("value"))
+        if value is None:
+            return None
+
+        verb = match.group("verb").lower()
+        if verb in {"dislike", "hate"}:
+            text = f"User does not like {value}."
+        else:
+            text = f"User {verb}s {value}."
+
+        return cls._candidate(
+            conversation=conversation,
+            message=message,
+            memory_type="preference",
+            content=text,
+            confidence=0.95,
+            metadata={"extraction_method": "rule_based"},
+        )
+
+    @classmethod
+    def _extract_profile_field(
+        cls,
+        *,
+        conversation: Conversation,
+        message: ConversationMessage,
+        content: str,
+    ) -> CandidateMemory | None:
+        match = _MY_FIELD_RE.match(content)
+        if not match:
+            return None
+
+        field = " ".join(match.group("field").lower().split())
+        value = cls._clean_rule_value(match.group("value"))
+        if value is None:
+            return None
+
+        return cls._candidate(
+            conversation=conversation,
+            message=message,
+            memory_type="profile",
+            content=f"User's {field} is {value}.",
+            confidence=0.96,
+            metadata={
+                "extraction_method": "rule_based",
+                "attribute": field,
+            },
+        )
+
+    @classmethod
+    def _extract_i_am_profile(
+        cls,
+        *,
+        conversation: Conversation,
+        message: ConversationMessage,
+        content: str,
+    ) -> CandidateMemory | None:
+        match = _I_AM_RE.match(content)
+        if not match:
+            return None
+
+        value = cls._clean_rule_value(match.group("value"))
+        if value is None:
+            return None
+
+        first_word = value.split()[0].lower()
+        if first_word in _TRANSIENT_I_AM_PREFIXES:
+            return None
+
+        return cls._candidate(
+            conversation=conversation,
+            message=message,
+            memory_type="profile",
+            content=f"User is {value}.",
+            confidence=0.9,
+            metadata={"extraction_method": "rule_based"},
+        )
+
+    @classmethod
+    def _extract_remember_instruction(
+        cls,
+        *,
+        conversation: Conversation,
+        message: ConversationMessage,
+        content: str,
+    ) -> CandidateMemory | None:
+        match = _REMEMBER_RE.match(content)
+        if not match:
+            return None
+
+        value = cls._clean_rule_value(match.group("value"))
+        if value is None:
+            return None
+
+        return cls._candidate(
+            conversation=conversation,
+            message=message,
+            memory_type="instruction",
+            content=f"User asked to remember that {value}.",
+            confidence=0.9,
+            metadata={"extraction_method": "rule_based"},
+        )
+
+    @staticmethod
+    def _clean_rule_value(value: str) -> str | None:
+        cleaned = value.strip().strip("\"'")
+        cleaned = cleaned.rstrip(".!")
+        cleaned = " ".join(cleaned.split())
+
+        if (
+            not cleaned
+            or len(cleaned) > _MAX_RULE_VALUE_CHARS
+            or len(cleaned.split()) > _MAX_RULE_VALUE_WORDS
+        ):
+            return None
+
+        return cleaned
+
+    @staticmethod
+    def _candidate(
+        *,
+        conversation: Conversation,
+        message: ConversationMessage,
+        memory_type: str,
+        content: str,
+        confidence: float,
+        metadata: dict[str, object],
+    ) -> CandidateMemory:
+        return CandidateMemory(
+            user_id=conversation.user_id,
+            memory_type=memory_type,
+            content=content,
+            confidence=confidence,
+            source=MemorySource(
+                thread_id=conversation.thread_id,
+                message_ids=[message.message_id],
+            ),
+            metadata=metadata,
         )
 
     @staticmethod

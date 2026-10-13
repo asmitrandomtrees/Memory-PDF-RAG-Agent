@@ -16,61 +16,14 @@ from app.memory.stm.models import STMMessage
 from app.memory.stm.writer import STMWriter
 from app.observability.tracker import ObservabilityTracker
 from app.runtime.session import AgentSession
+from app.runtime.text_utils import is_trivial_small_talk, small_talk_reply
 
 
-_GREETING_WORDS = {"hi", "hello", "hey", "hii"}
-_ACKNOWLEDGEMENTS = {"thanks", "thank you", "thx"}
-_NEUTRAL_ACKNOWLEDGEMENTS = {"ok", "okay"}
-_DAY_GREETINGS = {"good morning", "good afternoon", "good evening"}
-_CANNED_REPLIES = {
-    "hi how can i help you today",
-    "you re welcome how can i help",
-}
 _DURABLE_PROFILE_PATTERNS = (
     re.compile(r"\bmy\s+\w+\s+is\b", re.IGNORECASE),
     re.compile(r"\bi\s+am\b", re.IGNORECASE),
     re.compile(r"\bi'm\b", re.IGNORECASE),
 )
-
-
-def is_trivial_small_talk(text: str) -> bool:
-    content = text.strip()
-    if not content:
-        return True
-
-    words = re.findall(r"[A-Za-z]+(?:['-][A-Za-z]+)?", content)
-    if not words:
-        return False
-
-    normalized_words = [word.lower() for word in words]
-    normalized = " ".join(normalized_words)
-
-    if (
-        normalized in _ACKNOWLEDGEMENTS
-        or normalized in _NEUTRAL_ACKNOWLEDGEMENTS
-        or normalized in _DAY_GREETINGS
-        or normalized in _CANNED_REPLIES
-    ):
-        return True
-
-    if normalized_words[0] in _GREETING_WORDS:
-        if len(words) == 1:
-            return True
-        return len(words) == 2 and words[1][0].isupper()
-
-    return False
-
-
-def small_talk_reply(text: str) -> str:
-    normalized = " ".join(
-        word.lower()
-        for word in re.findall(r"[A-Za-z]+(?:['-][A-Za-z]+)?", text)
-    )
-    if normalized in _ACKNOWLEDGEMENTS:
-        return "You're welcome! How can I help?"
-    if normalized in _NEUTRAL_ACKNOWLEDGEMENTS:
-        return "Okay."
-    return "Hi! How can I help you today?"
 
 
 class AgentTimingSink:

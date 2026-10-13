@@ -10,6 +10,7 @@ from app.contracts.retrieval import RetrievedItem
 from app.contracts.runtime import AgentResponse
 from app.rag.pdf_ingest import document_id_for
 from app.runtime.conversation_store import JsonlConversationStore
+from app.runtime.thread_state import JsonThreadStateStore
 
 
 class FakeEmbeddings:
@@ -56,8 +57,10 @@ class FakeVectorStore:
 class FakeRuntime:
     def __init__(self, conversation_store: JsonlConversationStore) -> None:
         self.conversation_store = conversation_store
+        self.requests = []
 
     def handle(self, request):
+        self.requests.append(request)
         timestamp = datetime.now(timezone.utc)
         self.conversation_store.append_message(
             ConversationMessage(
@@ -66,6 +69,7 @@ class FakeRuntime:
                 role="user",
                 content=request.message,
                 timestamp=timestamp,
+                metadata=request.metadata,
             )
         )
         answer = f"Reply: {request.message}"
@@ -83,6 +87,7 @@ class FakeRuntime:
             thread_id=request.thread_id,
             answer=answer,
             trace_id=f"trace-{request.user_id}",
+            metadata={"request_metadata": request.metadata},
         )
 
 
@@ -102,12 +107,14 @@ def _test_client(tmp_path: Path):
         JsonlConversationStore(settings.conversation_data_path),
         profile_store,
     )
+    thread_state_store = JsonThreadStateStore(tmp_path / "thread_state")
     vector_store = FakeVectorStore()
     services = {
         "settings": settings,
         "embeddings": FakeEmbeddings(),
         "vector_store": vector_store,
         "conversation_store": conversation_store,
+        "thread_state_store": thread_state_store,
         "upload_root": Path(settings.pdf_upload_path),
         "user_store": profile_store,
         "runtimes": {},

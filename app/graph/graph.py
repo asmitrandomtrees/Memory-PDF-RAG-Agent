@@ -164,6 +164,7 @@ class RetrievalPipeline:
         thread_id: str,
         query: str,
         document_ids: list[str] | None = None,
+        source_policy: str | None = None,
         trace_id: str | None = None,
     ) -> GraphState:
         return self.compiled.invoke(
@@ -172,6 +173,7 @@ class RetrievalPipeline:
                 "thread_id": thread_id,
                 "query": query,
                 "document_ids": document_ids or [],
+                "source_policy": source_policy,
                 "recent_items": self._recent_thread_items(
                     user_id=user_id,
                     thread_id=thread_id,
@@ -187,18 +189,22 @@ class RetrievalPipeline:
         trace_id: str,
     ) -> AgentResponse:
         document_ids = request.metadata.get("document_ids", [])
+        source_policy = request.metadata.get("source_policy")
         started_at = datetime.now(timezone.utc)
         started_clock = time.perf_counter()
         if not isinstance(document_ids, list) or not all(
             isinstance(document_id, str) for document_id in document_ids
         ):
             document_ids = []
+        if not isinstance(source_policy, str):
+            source_policy = None
 
         state = self.invoke(
             user_id=request.user_id,
             thread_id=request.thread_id,
             query=request.message,
             document_ids=document_ids,
+            source_policy=source_policy,
             trace_id=trace_id,
         )
         completed_at = datetime.now(timezone.utc)
@@ -474,6 +480,8 @@ class RetrievalPipeline:
 
     @staticmethod
     def _thread_prefers_pdf_context(state: GraphState) -> bool:
+        if state.get("source_policy") == "pdf_only":
+            return True
         if state.get("document_ids"):
             return True
 

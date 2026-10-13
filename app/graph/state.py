@@ -17,6 +17,7 @@ class GraphState(TypedDict, total=False):
     query: str
     rewritten_query: str
     document_ids: list[str]
+    source_policy: str | None
     query_analysis: QueryAnalysis
     date_start_at: datetime | None
     date_end_at: datetime | None

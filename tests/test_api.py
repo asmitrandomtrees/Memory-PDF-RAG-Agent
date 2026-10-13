@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import hashlib
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -8,6 +9,7 @@ from app.contracts.conversation import Conversation, ConversationMessage
 from app.contracts.retrieval import RetrievedItem
 from app.contracts.runtime import AgentResponse
 from app.runtime.conversation_store import JsonlConversationStore
+from app.runtime.thread_state import JsonThreadStateStore
 
 
 class FakeEmbeddings:
@@ -46,8 +48,10 @@ class FakeVectorStore:
 class FakeRuntime:
     def __init__(self, conversation_store: JsonlConversationStore) -> None:
         self.conversation_store = conversation_store
+        self.requests = []
 
     def handle(self, request):
+        self.requests.append(request)
         now = datetime.now(timezone.utc)
         self.conversation_store.append_message(
             ConversationMessage(
@@ -56,6 +60,7 @@ class FakeRuntime:
                 role="user",
                 content=request.message,
                 timestamp=now,
+                metadata=request.metadata,
             )
         )
         answer = f"Received: {request.message}"
@@ -74,6 +79,7 @@ class FakeRuntime:
             thread_id=request.thread_id,
             answer=answer,
             trace_id="trace_test",
+            metadata={"request_metadata": request.metadata},
         )
 
 
@@ -108,6 +114,15 @@ def _make_pdf(path: Path) -> None:
     path.write_bytes(pdf)
 
 
+def _document_id_for(path: Path) -> str:
+    resolved = path.resolve()
+    digest = hashlib.sha256()
+    digest.update(str(resolved).casefold().encode("utf-8"))
+    digest.update(b"\0")
+    digest.update(resolved.read_bytes())
+    return digest.hexdigest()
+
+
 def _test_client(tmp_path):
     import app.api as api_module
 
@@ -120,14 +135,17 @@ def _test_client(tmp_path):
     conversation_store = JsonlConversationStore(
         settings.conversation_data_path
     )
+    thread_state_store = JsonThreadStateStore(tmp_path / "thread_state")
     vector_store = FakeVectorStore()
     embeddings = FakeEmbeddings()
+    runtime = FakeRuntime(conversation_store)
     services = {
         "settings": settings,
         "embeddings": embeddings,
         "vector_store": vector_store,
         "conversation_store": conversation_store,
-        "runtime": FakeRuntime(conversation_store),
+        "thread_state_store": thread_state_store,
+        "runtime": runtime,
         "upload_directory": Path(settings.pdf_upload_path).resolve(),
     }
     application = api_module.create_app(services_factory=lambda: services)
@@ -188,6 +206,62 @@ def test_upload_list_and_delete_pdf(tmp_path) -> None:
         assert deleted.status_code == 200
         assert client.get("/api/documents").json() == []
         assert vector_store.items == {}
+
+
+def test_pdf_only_thread_state_is_reused_for_follow_up_messages(tmp_path) -> None:
+    client, vector_store = _test_client(tmp_path)
+    with client:
+        services = client.app.state.services
+        pdf_path = services["upload_directory"] / "Spec.pdf"
+        services["upload_directory"].mkdir(parents=True, exist_ok=True)
+        _make_pdf(pdf_path)
+        document_id = _document_id_for(pdf_path)
+        vector_store.add(
+            collection=services["settings"].pdf_collection,
+            ids=[f"{document_id}_p1_c0"],
+            documents=["seed content"],
+            embeddings=[[1.0, 0.0]],
+            metadatas=[
+                {
+                    "document_id": document_id,
+                    "source": "pdf",
+                    "source_path": str(pdf_path.resolve()),
+                    "filename": "Spec.pdf",
+                    "page_number": 1,
+                }
+            ],
+        )
+        thread_id = client.post("/api/threads").json()["thread_id"]
+
+        setup = client.post(
+            f"/api/threads/{thread_id}/messages",
+            json={
+                "message": (
+                    "I will ask questions regarding the uploaded pdf. "
+                    "Please answer only based on the pdf"
+                ),
+                "document_ids": [],
+            },
+        )
+        assert setup.status_code == 200
+        assert setup.json()["metadata"]["request_metadata"] == {
+            "document_ids": [document_id],
+            "source_policy": "pdf_only",
+        }
+
+        follow_up = client.post(
+            f"/api/threads/{thread_id}/messages",
+            json={
+                "message": "What type of cooling tower is specified?",
+                "document_ids": [],
+            },
+        )
+
+        assert follow_up.status_code == 200
+        assert follow_up.json()["metadata"]["request_metadata"] == {
+            "document_ids": [document_id],
+            "source_policy": "pdf_only",
+        }
 
 
 def test_upload_rejects_non_pdf_and_blank_chat(tmp_path) -> None:

@@ -16,16 +16,27 @@ from starlette.concurrency import run_in_threadpool
 from app.config.instance_settings import settings_for_instance
 from app.config.settings import Settings, get_settings
 from app.contracts.runtime import AgentRequest
-from app.embeddings.factory import create_embedding_provider
-from app.rag.pdf_ingest import document_id_for, ingest_pdf
-from app.runtime.agent import AgentRuntime
 from app.runtime.conversation_store import JsonlConversationStore
-from app.runtime.factory import create_runtime
-from app.vectorstores.factory import create_vector_store
+from app.runtime.thread_state import JsonThreadStateStore, ThreadSourceState
 
-LOCAL_USER_ID = "local-user-1"
+LOCAL_USER_ID = "local-user-2"
 FRONTEND_DIST = Path(__file__).resolve().parents[1] / "frontend" / "dist"
 PDF_SIGNATURE = b"%PDF-"
+PDF_ONLY_PATTERNS = (
+    re.compile(r"\b(uploaded\s+)?pdf\b", re.IGNORECASE),
+    re.compile(r"\b(uploaded\s+)?document\b", re.IGNORECASE),
+)
+PDF_ONLY_QUALIFIERS = (
+    "only",
+    "based on",
+    "regarding",
+    "from the pdf",
+    "using the pdf",
+)
+CLEAR_SOURCE_POLICY_PATTERNS = (
+    re.compile(r"\bstop\s+(using|checking)\s+(the\s+)?pdf\b", re.IGNORECASE),
+    re.compile(r"\banswer\s+generally\b", re.IGNORECASE),
+)
 
 
 class ChatRequest(BaseModel):
@@ -51,10 +62,18 @@ class DocumentSummary(BaseModel):
 
 
 def _build_services() -> dict[str, Any]:
+    from app.embeddings.factory import create_embedding_provider
+    from app.runtime.factory import create_runtime
+    from app.vectorstores.factory import create_vector_store
+
     settings = settings_for_instance(get_settings(), "api")
     embeddings = create_embedding_provider(settings)
     vector_store = create_vector_store(settings)
     conversation_store = JsonlConversationStore(settings.conversation_data_path)
+    thread_state_store = JsonThreadStateStore(
+        Path(settings.conversation_data_path).resolve().parent
+        / "thread_state"
+    )
     runtime = create_runtime(
         settings=settings,
         embeddings=embeddings,
@@ -68,9 +87,71 @@ def _build_services() -> dict[str, Any]:
         "embeddings": embeddings,
         "vector_store": vector_store,
         "conversation_store": conversation_store,
+        "thread_state_store": thread_state_store,
         "runtime": runtime,
         "upload_directory": upload_directory,
     }
+
+
+def _message_requests_pdf_only(message: str) -> bool:
+    normalized = message.strip().lower()
+    if not normalized:
+        return False
+    return any(pattern.search(message) for pattern in PDF_ONLY_PATTERNS) and any(
+        qualifier in normalized for qualifier in PDF_ONLY_QUALIFIERS
+    )
+
+
+def _message_clears_source_policy(message: str) -> bool:
+    return any(pattern.search(message) for pattern in CLEAR_SOURCE_POLICY_PATTERNS)
+
+
+def _available_document_ids(services: dict[str, Any]) -> list[str]:
+    directory: Path = services["upload_directory"]
+    store = services["vector_store"]
+    settings: Settings = services["settings"]
+    document_ids: list[str] = []
+    for path in sorted(directory.glob("*.pdf")):
+        metadata_items = store.get_by_metadata(
+            collection=settings.pdf_collection,
+            filters={"source_path": str(path.resolve())},
+        )
+        if not metadata_items:
+            continue
+        document_id = metadata_items[0].metadata.get("document_id")
+        if isinstance(document_id, str) and document_id not in document_ids:
+            document_ids.append(document_id)
+    return document_ids
+
+
+def _resolve_thread_source_state(
+    *,
+    services: dict[str, Any],
+    user_id: str,
+    thread_id: str,
+    message: str,
+    requested_document_ids: list[str],
+) -> ThreadSourceState:
+    store: JsonThreadStateStore = services["thread_state_store"]
+    state = store.load(user_id, thread_id)
+
+    if _message_clears_source_policy(message):
+        state = ThreadSourceState()
+        store.save(user_id, thread_id, state)
+        return state
+
+    if requested_document_ids:
+        state.document_ids = requested_document_ids
+
+    if _message_requests_pdf_only(message):
+        state.source_policy = "pdf_only"
+        if not state.document_ids:
+            state.document_ids = _available_document_ids(services)
+
+    if state.source_policy == "pdf_only":
+        store.save(user_id, thread_id, state)
+
+    return state
 
 
 def create_app(
@@ -152,13 +233,25 @@ def create_app(
         if not body.message.strip():
             raise HTTPException(status_code=422, detail="Message cannot be blank")
 
-        runtime: AgentRuntime = application.state.services["runtime"]
+        services = application.state.services
+        runtime = services["runtime"]
+        thread_state = _resolve_thread_source_state(
+            services=services,
+            user_id=LOCAL_USER_ID,
+            thread_id=thread_id,
+            message=body.message.strip(),
+            requested_document_ids=body.document_ids,
+        )
+        document_ids = body.document_ids or thread_state.document_ids
         response = runtime.handle(
             AgentRequest(
                 user_id=LOCAL_USER_ID,
                 thread_id=thread_id,
                 message=body.message.strip(),
-                metadata={"document_ids": body.document_ids},
+                metadata={
+                    "document_ids": document_ids,
+                    "source_policy": thread_state.source_policy,
+                },
             )
         )
         return response.model_dump(mode="json")
@@ -193,6 +286,8 @@ def create_app(
     async def upload_document(
         file: Annotated[UploadFile, File()],
     ) -> DocumentSummary:
+        from app.rag.pdf_ingest import document_id_for, ingest_pdf
+
         services = application.state.services
         settings: Settings = services["settings"]
         directory: Path = services["upload_directory"]
@@ -250,6 +345,8 @@ def create_app(
 
     @application.delete("/api/documents/{document_id}")
     def delete_document(document_id: str) -> dict[str, str]:
+        from app.rag.pdf_ingest import document_id_for
+
         services = application.state.services
         directory: Path = services["upload_directory"]
         settings: Settings = services["settings"]

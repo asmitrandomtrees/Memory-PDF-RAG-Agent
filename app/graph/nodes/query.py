@@ -7,7 +7,7 @@ from app.contracts.routing import RetrievalPlan
 from app.graph.schemas import INDIA_TIMEZONE, QueryAnalysis
 from app.llm.prompts import render_chat_prompt
 from app.llm.provider import LLMProvider
-from app.runtime.agent import is_trivial_small_talk
+from app.runtime.text_utils import is_trivial_small_talk
 
 
 _ANALYSIS_PROMPT = ChatPromptTemplate.from_messages(
@@ -100,23 +100,14 @@ class RetrievalPlanner:
         prefer_pdf: bool = False,
     ) -> RetrievalPlan:
         document_ids = document_ids or analysis.document_ids
-        if (document_ids or prefer_pdf) and analysis.intent == "document_question":
-            return RetrievalPlan(
-                use_pdf=True,
-                metadata={
-                    "reason": (
-                        "selected_documents"
-                        if document_ids
-                        else "thread_pdf_context"
-                    )
-                },
-            )
-        if (
-            analysis.intent == "general"
-            and not prefer_pdf
-            and not _looks_like_contextual_follow_up(query)
-        ):
-            return RetrievalPlan(use_stm=False, use_ltm=False, use_pdf=False)
+        deterministic_plan = _deterministic_source_plan(
+            query=query,
+            analysis=analysis,
+            document_ids=document_ids,
+            prefer_pdf=prefer_pdf,
+        )
+        if deterministic_plan is not None:
+            return deterministic_plan
 
         plan = self.llm.structured_output(
             render_chat_prompt(
@@ -179,6 +170,85 @@ def _looks_like_contextual_follow_up(query: str) -> bool:
     return False
 
 
+def _deterministic_source_plan(
+    *,
+    query: str,
+    analysis: QueryAnalysis,
+    document_ids: list[str],
+    prefer_pdf: bool,
+) -> RetrievalPlan | None:
+    contextual_follow_up = _looks_like_contextual_follow_up(query)
+    pdf_context = bool(document_ids) or prefer_pdf
+    if pdf_context:
+        return RetrievalPlan(
+            use_stm=contextual_follow_up,
+            use_pdf=True,
+            metadata={
+                "router": "deterministic",
+                "reason": (
+                    "selected_documents"
+                    if document_ids
+                    else "thread_pdf_context"
+                ),
+            },
+        )
+
+    if _looks_like_explicit_document_query(query) or analysis.intent == "document_question":
+        return RetrievalPlan(
+            use_pdf=True,
+            metadata={
+                "router": "deterministic",
+                "reason": "document_query",
+            },
+        )
+
+    if _looks_like_profile_statement(query):
+        return RetrievalPlan(
+            metadata={
+                "router": "deterministic",
+                "reason": "profile_statement",
+            },
+        )
+
+    if contextual_follow_up:
+        return RetrievalPlan(
+            use_stm=True,
+            metadata={
+                "router": "deterministic",
+                "reason": "contextual_follow_up",
+            },
+        )
+
+    if analysis.intent == "episodic_recall":
+        return RetrievalPlan(
+            use_stm=True,
+            metadata={
+                "router": "deterministic",
+                "reason": "episodic_recall",
+            },
+        )
+
+    if analysis.intent == "memory_recall":
+        return RetrievalPlan(
+            use_stm=True,
+            use_ltm=True,
+            metadata={
+                "router": "deterministic",
+                "reason": "memory_recall",
+            },
+        )
+
+    if analysis.intent == "general":
+        return RetrievalPlan(
+            metadata={
+                "router": "deterministic",
+                "reason": "standalone_general",
+            },
+        )
+
+    return None
+
+
 _RETRIEVAL_CUE_TERMS = {
     "document",
     "documents",
@@ -198,6 +268,22 @@ _RETRIEVAL_CUE_TERMS = {
     "uploaded",
     "we",
 }
+
+_DOCUMENT_QUERY_TERMS = {
+    "document",
+    "documents",
+    "file",
+    "files",
+    "pdf",
+    "source",
+    "uploaded",
+}
+
+_PROFILE_STATEMENT_PATTERNS = (
+    re.compile(r"\bmy\s+\w+\s+is\b", re.IGNORECASE),
+    re.compile(r"\bi\s+am\b", re.IGNORECASE),
+    re.compile(r"\bi'm\b", re.IGNORECASE),
+)
 
 _GENERAL_QUERY_STARTS = {
     "can",
@@ -233,3 +319,17 @@ def _looks_like_standalone_general_query(query: str) -> bool:
         return False
 
     return tokens[0] in _GENERAL_QUERY_STARTS
+
+
+def _looks_like_explicit_document_query(query: str) -> bool:
+    tokens = set(re.findall(r"[a-z0-9']+", query.strip().lower()))
+    return bool(tokens & _DOCUMENT_QUERY_TERMS)
+
+
+def _looks_like_profile_statement(query: str) -> bool:
+    stripped = query.strip()
+    if not stripped:
+        return False
+    if stripped.endswith("?"):
+        return False
+    return any(pattern.search(stripped) for pattern in _PROFILE_STATEMENT_PATTERNS)
