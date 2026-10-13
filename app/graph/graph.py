@@ -18,7 +18,8 @@ from app.graph.nodes.answer import (
 from app.graph.nodes.context import ContextBuilder, LLMContextCompressor
 from app.graph.nodes.query import QueryAnalyzer, RetrievalPlanner
 from app.graph.nodes.retrieval import LTMNode, PDFNode, STMNode
-from app.graph.schemas import AnswerDraft, resolve_calendar_day
+from app.graph.evidence import extract_evidence
+from app.graph.schemas import AnswerDraft, EvidenceQuote, resolve_calendar_day
 from app.graph.state import GraphState
 from app.llm.provider import LLMProvider
 from app.graph.reranker import ReciprocalRankFusionReranker, Reranker
@@ -227,14 +228,22 @@ class RetrievalPipeline:
             except Exception as exc:
                 trace_error = str(exc)
 
+        insufficient_evidence = state.get("insufficient_evidence", True)
         response_metadata: dict[str, Any] = {
             "citations": self._citation_metadata(
                 state.get("cited_item_ids", []),
                 context,
             ),
-            "insufficient_evidence": state.get(
-                "insufficient_evidence", True
+            "evidence": [] if insufficient_evidence else extract_evidence(
+                answer=answer,
+                quotes=[
+                    EvidenceQuote.model_validate(quote)
+                    for quote in state.get("evidence", [])
+                ],
+                cited_item_ids=state.get("cited_item_ids", []),
+                context=context,
             ),
+            "insufficient_evidence": insufficient_evidence,
             "retrieval_errors": state.get("retrieval_errors", {}),
             "retry_count": state.get("retry_count", 0),
             "validation": state.get("validation", {}),
@@ -350,6 +359,7 @@ class RetrievalPipeline:
                 "context": None,
                 "answer": None,
                 "cited_item_ids": [],
+                "evidence": [],
                 "insufficient_evidence": False,
                 "validation": {},
             }
@@ -427,6 +437,7 @@ class RetrievalPipeline:
             return {
                 "answer": draft.answer,
                 "cited_item_ids": draft.cited_item_ids,
+                "evidence": [quote.model_dump() for quote in draft.evidence],
                 "insufficient_evidence": draft.insufficient_evidence,
             }
 
@@ -471,6 +482,7 @@ class RetrievalPipeline:
         return {
             "answer": RetrievalPipeline._insufficient_evidence_answer(),
             "cited_item_ids": [],
+            "evidence": [],
             "insufficient_evidence": True,
             "validation": {
                 **state.get("validation", {}),

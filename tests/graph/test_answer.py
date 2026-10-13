@@ -137,3 +137,4 @@ def test_validator_accepts_original_ids_referenced_by_stm_summary() -> None:
 
     assert validation.is_valid is True
     assert validation.needs_retrieval is False
+

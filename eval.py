@@ -2,11 +2,9 @@ import argparse
 import json
 from pathlib import Path
 
-from app.config.settings import get_settings
-from app.contracts.context import AgentContext
 from app.contracts.retrieval import RetrievalResult, RetrievedItem
 from app.contracts.routing import RetrievalPlan
-from app.evaluation.datasets import BENCHMARK_DATASET, EvalTestCase
+from app.evaluation.datasets import BENCHMARK_DATASET
 from app.evaluation.runner import EvaluationRunner
 from app.graph.graph import RetrievalPipeline
 from app.graph.nodes.context import ContextSummary
@@ -60,23 +58,16 @@ class MockEvaluationLLM:
             return ContextSummary(summary="Compressed context summary.")
 
         if output_schema is AnswerDraft:
+            # Cite only items actually present in the supplied evidence; citing
+            # anything else fails validation and triggers a query rewrite.
+            evidence = self._extract_after(user_msg, "Retrieved evidence (JSON): ")
+            try:
+                cited_ids = [item["item_id"] for item in json.loads(evidence)]
+            except (json.JSONDecodeError, KeyError, TypeError):
+                cited_ids = []
             return AnswerDraft(
                 answer="Generated evaluation response based on evidence.",
-                cited_item_ids=[
-                    "stm_msg_err_101",
-                    "stm_msg_sep18_01",
-                    "stm_msg_today_db_01",
-                    "stm_msg_goal_01",
-                    "ltm_pref_001",
-                    "ltm_pref_002",
-                    "ltm_fact_cloud_01",
-                    "ltm_fact_role_01",
-                    "pdf_chunk_api_lim_04",
-                    "pdf_chunk_comp_09",
-                    "pdf_chunk_err_fix_02",
-                    "pdf_chunk_benefits_03",
-                    "pdf_chunk_arch_01",
-                ],
+                cited_item_ids=cited_ids,
                 insufficient_evidence=False,
             )
 
@@ -84,9 +75,16 @@ class MockEvaluationLLM:
             return AnswerValidation(is_valid=True)
 
         if output_schema is RewrittenQuery:
-            return RewrittenQuery(query=user_msg)
+            # Return only the original query, not the whole rewrite prompt.
+            original = self._extract_after(user_msg, "Original query: ").split("\nValidation issue:")[0]
+            return RewrittenQuery(query=original.strip() or user_msg)
 
         raise AssertionError(f"Unexpected schema: {output_schema}")
+
+    @staticmethod
+    def _extract_after(text: str, marker: str) -> str:
+        _, found, rest = text.partition(marker)
+        return rest if found else text
 
 
 class MockBenchmarkRetriever:

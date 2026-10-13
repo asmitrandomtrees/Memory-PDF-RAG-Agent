@@ -57,6 +57,16 @@ class QueryAnalysis(BaseModel):
         return self
 
 
+class EvidenceQuote(BaseModel):
+    item_id: str = Field(description="ID of the retrieved item quoted.")
+    quote: str = Field(
+        description=(
+            "The shortest sentence or phrase copied verbatim from that "
+            "item's content that supports the claim."
+        ),
+    )
+
+
 class AnswerDraft(BaseModel):
     answer: str = Field(
         min_length=1,
@@ -72,7 +82,21 @@ class AnswerDraft(BaseModel):
             "or document-specific claims. Never include these IDs in answer."
         ),
     )
+    evidence: list[EvidenceQuote] = Field(
+        default_factory=list,
+        description=(
+            "One verbatim supporting quote per cited item. Never include "
+            "these quotes or IDs in answer."
+        ),
+    )
     insufficient_evidence: bool = False
+
+    @field_validator("evidence", mode="before")
+    @classmethod
+    def coerce_evidence(cls, v: Any) -> list[Any]:
+        if v is None:
+            return []
+        return list(v)
 
     @field_validator("cited_item_ids", mode="before")
     @classmethod

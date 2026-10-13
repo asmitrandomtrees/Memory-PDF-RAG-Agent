@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   FileText,
   FolderOpen,
+  GitCompareArrows,
   LoaderCircle,
   MessageSquare,
   Plus,
@@ -15,20 +16,8 @@ import {
   Upload,
   X,
 } from "lucide-react";
-
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
-
-async function api(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, options);
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const detail = typeof payload.detail === "string"
-      ? payload.detail
-      : `Request failed (${response.status})`;
-    throw new Error(detail);
-  }
-  return payload;
-}
+import { api } from "./api.js";
+import ComparePanel from "./Compare.jsx";
 
 function formatTime(timestamp) {
   if (!timestamp) return "";
@@ -51,6 +40,7 @@ function App() {
   const [error, setError] = useState("");
   const [uploadNotice, setUploadNotice] = useState("");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
   const fileInput = useRef(null);
   const messageList = useRef(null);
   const textarea = useRef(null);
@@ -231,6 +221,9 @@ function App() {
 
   return (
     <div className="flex h-dvh overflow-hidden bg-[#f8f9fb] text-[#172126]">
+      {compareOpen && (
+        <ComparePanel documents={documents} onClose={() => setCompareOpen(false)} />
+      )}
       {mobileSidebarOpen && (
         <button
           className="fixed inset-0 z-30 bg-slate-950/30 lg:hidden"
@@ -349,6 +342,18 @@ function App() {
             <p className="mt-2 text-center text-[10px] leading-4 text-[#9aa5a5]">
               PDF only · up to 25 MB each
             </p>
+            <button
+              onClick={() => {
+                setCompareOpen(true);
+                setMobileSidebarOpen(false);
+              }}
+              disabled={documents.length < 2}
+              title={documents.length < 2 ? "Upload at least two PDFs to compare" : "Compare specifications"}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-[#edf7f5] px-3 py-2 text-xs font-semibold text-[#126e64] transition hover:bg-[#dff1ed] disabled:opacity-50"
+            >
+              <GitCompareArrows size={15} />
+              Compare documents
+            </button>
           </div>
 
           <div className="space-y-1 pb-5">
@@ -622,7 +627,9 @@ function Message({ message }) {
             {message.content}
           </div>
         </div>
-        {!isUser && Array.isArray(message.metadata?.citations) && message.metadata.citations.length > 0 && (
+        {!isUser && Array.isArray(message.metadata?.evidence) && message.metadata.evidence.length > 0 ? (
+          <Evidence entries={message.metadata.evidence} />
+        ) : !isUser && Array.isArray(message.metadata?.citations) && message.metadata.citations.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {message.metadata.citations.map((citation, index) => (
               <span
@@ -641,6 +648,42 @@ function Message({ message }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function evidenceLabel(entry) {
+  if (entry.filename) {
+    return entry.page_number ? `${entry.filename} · p.${entry.page_number}` : entry.filename;
+  }
+  if (entry.source === "stm") return "Earlier conversation";
+  if (entry.source === "ltm") return "Saved memory";
+  return entry.source || "Source";
+}
+
+function Evidence({ entries }) {
+  return (
+    <details className="group mt-2 text-left" open>
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-[10px] font-semibold text-[#839091] select-none">
+        <ShieldCheck size={11} />
+        Evidence ({entries.length})
+      </summary>
+      <div className="mt-1.5 space-y-1.5">
+        {entries.map((entry, index) => (
+          <figure
+            key={`${entry.item_id}-${index}`}
+            className="rounded-lg border border-[#e8edec] border-l-2 border-l-[#087d70] bg-white px-3 py-2"
+          >
+            <blockquote className="text-[11px] leading-[1.6] text-[#4b5859] italic">
+              “{entry.quote}”
+            </blockquote>
+            <figcaption className="mt-1 inline-flex items-center gap-1 text-[9px] text-[#839091]">
+              <FileText size={10} />
+              {evidenceLabel(entry)}
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+    </details>
   );
 }
 

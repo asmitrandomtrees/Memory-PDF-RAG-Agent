@@ -14,12 +14,17 @@ class ChromaVectorStore:
             raise VectorStoreError(
                 f"Failed to initialize Chroma: {path}"
             ) from exc
+        self._collections: dict[str, Any] = {}
 
     def _collection(self, name: str):
-        return self.client.get_or_create_collection(
-            name=name,
-            metadata={"hnsw:space": "cosine"},
-        )
+        collection = self._collections.get(name)
+        if collection is None:
+            collection = self.client.get_or_create_collection(
+                name=name,
+                metadata={"hnsw:space": "cosine"},
+            )
+            self._collections[name] = collection
+        return collection
 
     def _build_where(
         self,

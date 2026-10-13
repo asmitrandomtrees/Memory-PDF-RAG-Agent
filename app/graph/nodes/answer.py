@@ -36,7 +36,10 @@ _ANSWER_PROMPT = ChatPromptTemplate.from_messages(
             "lookups unless supplied context contains those results. "
             "For each claim based on a retrieved item, include its exact "
             "item_id in cited_item_ids only; IDs are internal metadata and "
-            "must not appear in answer. Set insufficient_evidence=true only "
+            "must not appear in answer. For each cited item, add an evidence "
+            "entry with its item_id and the shortest sentence or phrase "
+            "copied verbatim from that item's content that supports the "
+            "claim; do not paraphrase. Set insufficient_evidence=true only "
             "when you genuinely cannot provide a useful answer.",
         ),
         (

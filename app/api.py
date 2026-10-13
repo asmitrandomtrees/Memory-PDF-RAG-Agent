@@ -8,11 +8,20 @@ from uuid import uuid4
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
+from app.comparison import (
+    COMPARISON_TIMEOUT_SECONDS,
+    DEFAULT_ASPECTS,
+    ComparisonReport,
+    SpecComparator,
+    documents_from_store,
+    to_csv,
+    to_markdown,
+)
 from app.config.instance_settings import settings_for_instance
 from app.config.settings import Settings, get_settings
 from app.contracts.runtime import AgentRequest
@@ -52,6 +61,12 @@ class ThreadSummary(BaseModel):
     thread_id: str
     title: str
     updated_at: str | None = None
+
+
+class CompareRequest(BaseModel):
+    document_ids: list[str] = Field(min_length=2)
+    baseline_document_id: str | None = None
+    aspects: list[str] = Field(default_factory=list)
 
 
 class DocumentSummary(BaseModel):
@@ -366,6 +381,60 @@ def create_app(
             path.unlink()
             return {"deleted": document_id}
         raise HTTPException(status_code=404, detail="Document not found")
+
+    def get_comparator() -> SpecComparator:
+        services = application.state.services
+        if "comparator" not in services:
+            from app.llm.azure_openai import AzureOpenAIProvider
+
+            services["comparator"] = SpecComparator(
+                llm=AzureOpenAIProvider(timeout_seconds=COMPARISON_TIMEOUT_SECONDS),
+                embeddings=services["embeddings"],
+                vector_store=services["vector_store"],
+                collection=services["settings"].pdf_collection,
+            )
+        return services["comparator"]
+
+    @application.get("/api/compare/aspects")
+    def list_comparison_aspects() -> list[dict[str, str]]:
+        return [
+            {"key": aspect.key, "title": aspect.title}
+            for aspect in DEFAULT_ASPECTS
+        ]
+
+    @application.post("/api/compare")
+    def compare_documents(body: CompareRequest) -> dict[str, Any]:
+        services = application.state.services
+        try:
+            documents = documents_from_store(
+                services["vector_store"],
+                services["settings"].pdf_collection,
+                list(dict.fromkeys(body.document_ids)),
+            )
+            report = get_comparator().compare(
+                documents,
+                baseline_document_id=body.baseline_document_id,
+                aspects=body.aspects or None,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return report.model_dump(mode="json")
+
+    @application.post("/api/compare/export")
+    def export_comparison(report: ComparisonReport, format: str = "csv") -> Response:
+        if format == "csv":
+            return Response(
+                "﻿" + to_csv(report),
+                media_type="text/csv; charset=utf-8",
+                headers={"Content-Disposition": 'attachment; filename="compliance-matrix.csv"'},
+            )
+        if format == "md":
+            return Response(
+                to_markdown(report),
+                media_type="text/markdown; charset=utf-8",
+                headers={"Content-Disposition": 'attachment; filename="spec-comparison.md"'},
+            )
+        raise HTTPException(status_code=422, detail="format must be csv or md")
 
     @application.get("/")
     def frontend_index():

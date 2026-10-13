@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     openai_deployment: str | None = Field(None, alias="OPENAI_DEPLOYMENT")
     openai_api_version: str | None = Field(None, alias="OPENAI_API_VERSION")
     openai_endpoint: str | None = Field(None, alias="OPENAI_ENDPOINT")
+    llm_timeout_seconds: float = Field(60.0, alias="LLM_TIMEOUT_SECONDS", gt=0)
+    llm_max_retries: int = Field(2, alias="LLM_MAX_RETRIES", ge=0)
 
     # Embeddings
     # embedding_model: str = Field(
@@ -70,6 +72,20 @@ class Settings(BaseSettings):
     background_memory_writes: bool = Field(
         True,
         alias="BACKGROUND_MEMORY_WRITES",
+    )
+
+    # Fine-tuning
+    finetune_base_model: str = Field(
+        "gpt-4o-mini-2024-07-18",
+        alias="FINETUNE_BASE_MODEL",
+    )
+    finetune_api_version: str = Field(
+        "2024-10-21",
+        alias="FINETUNE_API_VERSION",
+    )
+    finetune_data_path: str = Field(
+        "./data/finetuning",
+        alias="FINETUNE_DATA_PATH",
     )
 
 

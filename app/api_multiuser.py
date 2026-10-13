@@ -15,10 +15,16 @@ from starlette.concurrency import run_in_threadpool
 
 from app.api import (
     ChatRequest,
+    CompareRequest,
     DocumentSummary,
     PDF_SIGNATURE,
     _message_clears_source_policy,
     _message_requests_pdf_only,
+)
+from app.comparison import (
+    COMPARISON_TIMEOUT_SECONDS,
+    SpecComparator,
+    documents_from_store,
 )
 from app.config.settings import Settings, get_settings
 from app.config.instance_settings import settings_for_instance
@@ -611,5 +617,39 @@ def create_app(
                 path.unlink()
                 return {"deleted": document_id}
         raise HTTPException(status_code=404, detail="Document not found")
+
+    @application.post("/api/users/{user_id}/compare")
+    def compare_documents(user_id: str, body: CompareRequest) -> dict[str, Any]:
+        user_id = require_user(user_id)
+        services = application.state.services
+        settings: Settings = services["settings"]
+        collection = _user_pdf_collection(settings.pdf_collection, user_id)
+        if "comparison_llm" not in services:
+            from app.llm.azure_openai import AzureOpenAIProvider
+
+            services["comparison_llm"] = AzureOpenAIProvider(
+                timeout_seconds=COMPARISON_TIMEOUT_SECONDS
+            )
+        comparator = SpecComparator(
+            llm=services["comparison_llm"],
+            embeddings=services["embeddings"],
+            vector_store=services["vector_store"],
+            collection=collection,
+        )
+        try:
+            documents = documents_from_store(
+                services["vector_store"],
+                collection,
+                list(dict.fromkeys(body.document_ids)),
+            )
+            report = comparator.compare(
+                documents,
+                baseline_document_id=body.baseline_document_id,
+                aspects=body.aspects or None,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return report.model_dump(mode="json")
+
     return application
 app = create_app()

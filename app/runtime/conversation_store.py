@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from threading import Lock
 
 from app.contracts.conversation import Conversation, ConversationMessage
 from app.contracts.errors import ConversationStoreError
@@ -9,6 +10,13 @@ class JsonlConversationStore:
     def __init__(self, root_path: str | Path) -> None:
         self.root_path = Path(root_path)
         self.root_path.mkdir(parents=True, exist_ok=True)
+        # A single chat turn loads the same thread several times. Parsed
+        # messages are reused until the file's size or mtime changes.
+        self._cache: dict[
+            Path,
+            tuple[tuple[int, int], list[ConversationMessage]],
+        ] = {}
+        self._cache_lock = Lock()
 
     def _conversation_path(self, user_id: str, thread_id: str) -> Path:
         invalid_characters = ("/", "\\", ":", "\0")
@@ -39,10 +47,27 @@ class JsonlConversationStore:
     def load(self, user_id: str, thread_id: str) -> Conversation:
         path = self._conversation_path(user_id, thread_id)
 
-        if not path.exists():
+        try:
+            stat = path.stat()
+        except FileNotFoundError:
             return Conversation(
                 user_id=user_id,
                 thread_id=thread_id,
+            )
+        except OSError as exc:
+            raise ConversationStoreError(
+                f"Failed to load conversation "
+                f"user_id={user_id}, thread_id={thread_id}"
+            ) from exc
+
+        version = (stat.st_mtime_ns, stat.st_size)
+        with self._cache_lock:
+            cached = self._cache.get(path)
+        if cached is not None and cached[0] == version:
+            return Conversation(
+                user_id=user_id,
+                thread_id=thread_id,
+                messages=list(cached[1]),
             )
 
         messages: list[ConversationMessage] = []
@@ -66,10 +91,13 @@ class JsonlConversationStore:
                 f"user_id={user_id}, thread_id={thread_id}"
             ) from exc
 
+        with self._cache_lock:
+            self._cache[path] = (version, messages)
+
         return Conversation(
             user_id=user_id,
             thread_id=thread_id,
-            messages=messages,
+            messages=list(messages),
         )
 
     def list_threads(self, user_id: str) -> list[Conversation]:

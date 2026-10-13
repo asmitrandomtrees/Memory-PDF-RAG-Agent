@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from pathlib import Path
 
 import pdfplumber
@@ -11,13 +12,53 @@ from app.embeddings.provider import EmbeddingProvider
 from app.vectorstores.base import VectorStore
 
 
+_SENTENCE_END = re.compile(r"(?<=[.;:!?])\s+")
+
+
+def _split_long(sentence: str, size: int, overlap: int) -> list[str]:
+    step = size - overlap
+    return [sentence[i : i + size] for i in range(0, len(sentence), step)]
+
+
 def chunk_text(text: str, size: int = 800, overlap: int = 150) -> list[str]:
-    """Deterministic character chunking with overlap."""
+    """Deterministic sentence-aware chunking with overlap.
+
+    Chunks end on sentence boundaries so a fact is not cut in half, and
+    each chunk repeats trailing sentences (up to ``overlap`` chars) from
+    the previous one. Sentences longer than ``size`` are split by chars.
+    """
     if size <= overlap:
         raise ValueError("size must be larger than overlap")
-    step = size - overlap
-    pieces = (text[i : i + size] for i in range(0, len(text), step))
-    return [p.strip() for p in pieces if p.strip()]
+
+    sentences: list[str] = []
+    for sentence in _SENTENCE_END.split(" ".join(text.split())):
+        if len(sentence) > size:
+            sentences.extend(_split_long(sentence, size, overlap))
+        elif sentence:
+            sentences.append(sentence)
+
+    chunks: list[str] = []
+    current: list[str] = []
+    length = 0
+    for sentence in sentences:
+        if current and length + 1 + len(sentence) > size:
+            chunks.append(" ".join(current))
+            carried: list[str] = []
+            carried_length = 0
+            for previous in reversed(current):
+                if carried_length + len(previous) + 1 > overlap:
+                    break
+                carried.insert(0, previous)
+                carried_length += len(previous) + 1
+            # Only carry overlap that still leaves room for the new sentence.
+            if carried_length + len(sentence) > size:
+                carried, carried_length = [], 0
+            current, length = carried, carried_length
+        current.append(sentence)
+        length += len(sentence) + (1 if length else 0)
+    if current:
+        chunks.append(" ".join(current))
+    return [chunk.strip() for chunk in chunks if chunk.strip()]
 
 
 def document_id_for(pdf_path: str | Path) -> str:

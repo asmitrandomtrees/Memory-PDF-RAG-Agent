@@ -22,8 +22,14 @@ class AzureOpenAIProvider:
         *,
         chat_model: Any | None = None,
         callbacks: Sequence[BaseCallbackHandler] | None = None,
+        timeout_seconds: float | None = None,
     ) -> None:
         self.callbacks = list(callbacks or [])
+        # Some deployments (e.g. reasoning models) reject `temperature`.
+        # Remember that after the first rejection so every later call does
+        # not pay for a failed round trip before retrying.
+        self._temperature_supported = True
+        self._structured_models: dict[type[BaseModel], Any] = {}
         if chat_model is not None:
             self.chat_model = chat_model
             return
@@ -54,6 +60,9 @@ class AzureOpenAIProvider:
                 api_key=settings.openai_api_key,
                 azure_deployment=settings.openai_deployment,
                 api_version=settings.openai_api_version,
+                timeout=timeout_seconds
+                or getattr(settings, "llm_timeout_seconds", 60.0),
+                max_retries=getattr(settings, "llm_max_retries", 2),
             )
         except Exception as exc:
             raise ConfigurationError(
@@ -68,20 +77,11 @@ class AzureOpenAIProvider:
     ) -> LLMResponse:
         started = time.perf_counter()
         try:
-            try:
-                response = self.chat_model.invoke(
-                    self._to_langchain_messages(messages),
-                    **self._temperature_kwargs(temperature),
-                    **self._callback_kwargs(),
-                )
-            except Exception as inner_exc:
-                if "temperature" in str(inner_exc).lower() and temperature is not None:
-                    response = self.chat_model.invoke(
-                        self._to_langchain_messages(messages),
-                        **self._callback_kwargs(),
-                    )
-                else:
-                    raise
+            response = self._call_with_temperature(
+                self.chat_model,
+                messages,
+                temperature,
+            )
 
             if not isinstance(response.content, str):
                 raise LLMError(
@@ -118,29 +118,11 @@ class AzureOpenAIProvider:
     ) -> T:
         started = time.perf_counter()
         try:
-            try:
-                structured_model = self.chat_model.with_structured_output(
-                    output_schema,
-                    method="function_calling",
-                )
-            except (TypeError, ValueError):
-                structured_model = self.chat_model.with_structured_output(
-                    output_schema
-                )
-            try:
-                result = structured_model.invoke(
-                    self._to_langchain_messages(messages),
-                    **self._temperature_kwargs(temperature),
-                    **self._callback_kwargs(),
-                )
-            except Exception as inner_exc:
-                if "temperature" in str(inner_exc).lower() and temperature is not None:
-                    result = structured_model.invoke(
-                        self._to_langchain_messages(messages),
-                        **self._callback_kwargs(),
-                    )
-                else:
-                    raise
+            result = self._call_with_temperature(
+                self._structured_model(output_schema),
+                messages,
+                temperature,
+            )
 
             if isinstance(result, output_schema):
                 return result
@@ -157,11 +139,53 @@ class AzureOpenAIProvider:
                 (time.perf_counter() - started) * 1000,
             )
 
-    @staticmethod
+    def _structured_model(self, output_schema: type[T]) -> Any:
+        structured_model = self._structured_models.get(output_schema)
+        if structured_model is not None:
+            return structured_model
+
+        try:
+            structured_model = self.chat_model.with_structured_output(
+                output_schema,
+                method="function_calling",
+            )
+        except (TypeError, ValueError):
+            structured_model = self.chat_model.with_structured_output(
+                output_schema
+            )
+        self._structured_models[output_schema] = structured_model
+        return structured_model
+
+    def _call_with_temperature(
+        self,
+        model: Any,
+        messages: list[ChatMessage],
+        temperature: float | None,
+    ) -> Any:
+        converted = self._to_langchain_messages(messages)
+        temperature_kwargs = self._temperature_kwargs(temperature)
+        try:
+            return model.invoke(
+                converted,
+                **temperature_kwargs,
+                **self._callback_kwargs(),
+            )
+        except Exception as exc:
+            # Decide on what this call sent, not the shared flag: another
+            # thread may have flipped the flag while this call was in flight.
+            if (
+                not temperature_kwargs
+                or "temperature" not in str(exc).lower()
+            ):
+                raise
+            self._temperature_supported = False
+            return model.invoke(converted, **self._callback_kwargs())
+
     def _temperature_kwargs(
+        self,
         temperature: float | None,
     ) -> dict[str, float]:
-        if temperature is None:
+        if temperature is None or not self._temperature_supported:
             return {}
         return {"temperature": temperature}
 

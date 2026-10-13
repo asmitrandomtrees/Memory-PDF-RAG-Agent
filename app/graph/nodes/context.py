@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 import json
 from typing import Protocol
 
@@ -129,9 +130,10 @@ class ContextBuilder:
             selected.append(context_item)
             estimated_tokens += item_tokens
 
-        if self.compressor is not None:
-            for omitted in omitted_by_source.values():
-                summary = self.compressor.compress(omitted)
+        if self.compressor is not None and omitted_by_source:
+            for summary in self._compress_sources(
+                list(omitted_by_source.values())
+            ):
                 if summary is None:
                     continue
                 summary_tokens = self.estimate_tokens(summary.content)
@@ -145,6 +147,16 @@ class ContextBuilder:
             max_tokens=self.max_tokens,
             estimated_tokens=estimated_tokens,
         )
+
+    def _compress_sources(
+        self,
+        groups: list[list[ContextItem]],
+    ) -> list[ContextItem | None]:
+        # Each source is an independent LLM call; run them concurrently.
+        if len(groups) == 1:
+            return [self.compressor.compress(groups[0])]
+        with ThreadPoolExecutor(max_workers=len(groups)) as executor:
+            return list(executor.map(self.compressor.compress, groups))
 
     def estimate_tokens(self, content: str) -> int:
         if not content:

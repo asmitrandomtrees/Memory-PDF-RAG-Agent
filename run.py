@@ -5,6 +5,26 @@ from app.contracts.runtime import AgentRequest
 from app.runtime.factory import create_runtime
 
 
+def print_evidence(response) -> None:
+    evidence = response.metadata.get("evidence") or []
+    if not evidence:
+        return
+    print("\nEvidence:")
+    for index, entry in enumerate(evidence, start=1):
+        if entry.get("filename"):
+            label = entry["filename"]
+            if entry.get("page_number"):
+                label += f", page {entry['page_number']}"
+        elif entry.get("source") == "stm":
+            label = "earlier conversation"
+        elif entry.get("source") == "ltm":
+            label = "saved memory"
+        else:
+            label = entry.get("source", "source")
+        print(f"  [{index}] {label}")
+        print(f'      "{entry["quote"]}"')
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--user", required=True)
@@ -32,6 +52,7 @@ def main() -> None:
             )
         )
         print(f"\nAssistant: {response.answer}")
+        print_evidence(response)
         print(f"Trace ID: {response.trace_id}")
         return
 
@@ -54,6 +75,7 @@ def main() -> None:
         )
 
         print(f"\nAssistant: {response.answer}")
+        print_evidence(response)
         # print(f"Trace ID: {response.trace_id}")
 
 

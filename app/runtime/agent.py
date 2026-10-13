@@ -266,7 +266,10 @@ class AgentRuntime:
                     )
                 )
         except Exception as exc:
-            runtime_errors["stm_indexing"] = str(exc)
+            cause = exc.__cause__
+            runtime_errors["stm_indexing"] = (
+                f"{exc} (caused by {cause!r})" if cause else str(exc)
+            )
 
     @staticmethod
     def _should_capture_long_term_memory(

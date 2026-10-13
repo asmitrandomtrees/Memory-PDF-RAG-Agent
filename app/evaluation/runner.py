@@ -226,13 +226,22 @@ class EvaluationRunner:
         if total == 0:
             return results, EvaluationSuiteSummary()
 
-        recalls = [r.scores.recall_at_k for r in results]
-        precisions = [r.scores.precision_at_k for r in results]
-        mrrs = [r.scores.mrr for r in results]
-        ndcgs = [r.scores.ndcg_at_k for r in results]
-        routings = [r.scores.routing_score for r in results]
-        groundedness_scores = [r.scores.groundedness_score for r in results]
-        consolidation_scores = [r.scores.consolidation_score for r in results]
+        # Retrieval metrics only apply to retrieval cases and consolidation
+        # accuracy only to consolidation cases; averaging across both would
+        # dilute each with zeros from the other.
+        retrieval_results = [r for r in results if r.scenario != "consolidation"]
+        consolidation_results = [r for r in results if r.scenario == "consolidation"]
+
+        def _mean(values: list[float]) -> float:
+            return sum(values) / len(values) if values else 0.0
+
+        recalls = [r.scores.recall_at_k for r in retrieval_results]
+        precisions = [r.scores.precision_at_k for r in retrieval_results]
+        mrrs = [r.scores.mrr for r in retrieval_results]
+        ndcgs = [r.scores.ndcg_at_k for r in retrieval_results]
+        routings = [r.scores.routing_score for r in retrieval_results]
+        groundedness_scores = [r.scores.groundedness_score for r in retrieval_results]
+        consolidation_scores = [r.scores.consolidation_score for r in consolidation_results]
         latencies = [r.scores.latency_ms for r in results]
         retries = sum(r.scores.retries for r in results)
 
@@ -265,14 +274,14 @@ class EvaluationRunner:
         summary = EvaluationSuiteSummary(
             total_tests=total,
             passed_tests=sum(1 for r in results if r.error is None),
-            avg_recall_at_k=sum(recalls) / total,
-            avg_precision_at_k=sum(precisions) / total,
-            avg_mrr=sum(mrrs) / total,
-            avg_ndcg=sum(ndcgs) / total,
-            avg_routing_score=sum(routings) / total,
-            avg_groundedness=sum(groundedness_scores) / total,
-            avg_consolidation_score=sum(consolidation_scores) / total,
-            avg_latency_ms=sum(latencies) / total,
+            avg_recall_at_k=_mean(recalls),
+            avg_precision_at_k=_mean(precisions),
+            avg_mrr=_mean(mrrs),
+            avg_ndcg=_mean(ndcgs),
+            avg_routing_score=_mean(routings),
+            avg_groundedness=_mean(groundedness_scores),
+            avg_consolidation_score=_mean(consolidation_scores),
+            avg_latency_ms=_mean(latencies),
             total_retries=retries,
             scenario_breakdown=breakdown,
         )

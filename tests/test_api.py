@@ -278,3 +278,79 @@ def test_upload_rejects_non_pdf_and_blank_chat(tmp_path) -> None:
             json={"message": "   "},
         )
         assert blank_message.status_code == 422
+
+
+class FakeComparator:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def compare(self, documents, *, baseline_document_id=None, aspects=None):
+        from app.comparison.schemas import (
+            AspectResult,
+            ComparisonCell,
+            ComparisonReport,
+            ComparisonRow,
+        )
+
+        self.calls.append((documents, baseline_document_id, aspects))
+        return ComparisonReport(
+            documents=documents,
+            baseline_document_id=baseline_document_id or documents[0].document_id,
+            aspects=[
+                AspectResult(
+                    key="fan_motor",
+                    title="Fan motor ratings",
+                    rows=[
+                        ComparisonRow(
+                            aspect="fan_motor",
+                            parameter="Bearing life",
+                            status="deviation",
+                            cells=[
+                                ComparisonCell(document_id=documents[0].document_id, value="80,000 hr", assessment="baseline"),
+                                ComparisonCell(document_id=documents[1].document_id, value="50,000 hr", assessment="deviation"),
+                            ],
+                        )
+                    ],
+                )
+            ],
+        )
+
+
+def test_compare_documents_and_export_matrix(tmp_path) -> None:
+    client, vector_store = _test_client(tmp_path)
+    for document_id, filename in (("spec", "Spec.pdf"), ("vendor", "Vendor.pdf")):
+        vector_store.add(
+            collection="test_pdf_collection",
+            ids=[f"{document_id}_c0"],
+            documents=["text"],
+            embeddings=[[1.0, 0.0]],
+            metadatas=[{"document_id": document_id, "filename": filename, "source": "pdf"}],
+        )
+    comparator = FakeComparator()
+    with client:
+        client.app.state.services["comparator"] = comparator
+
+        aspects = client.get("/api/compare/aspects").json()
+        assert {"key": "pan_heater", "title": "Pan heaters"} in aspects
+
+        assert client.post("/api/compare", json={"document_ids": ["spec"]}).status_code == 422
+        missing = client.post("/api/compare", json={"document_ids": ["spec", "nope"]})
+        assert missing.status_code == 422
+        assert "nope" in missing.json()["detail"]
+
+        response = client.post(
+            "/api/compare",
+            json={"document_ids": ["spec", "vendor"], "aspects": ["fan_motor"]},
+        )
+        assert response.status_code == 200
+        report = response.json()
+        assert [d["filename"] for d in report["documents"]] == ["Spec.pdf", "Vendor.pdf"]
+        assert report["summary"]["deviation"] == 1
+        assert comparator.calls[0][2] == ["fan_motor"]
+
+        exported = client.post("/api/compare/export?format=csv", json=report)
+        assert exported.status_code == 200
+        assert "Bearing life,Deviation" in exported.text
+
+        markdown = client.post("/api/compare/export?format=md", json=report)
+        assert "## Fan motor ratings" in markdown.text

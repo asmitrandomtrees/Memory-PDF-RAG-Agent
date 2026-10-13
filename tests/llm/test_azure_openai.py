@@ -188,6 +188,28 @@ def test_structured_output_falls_back_when_temperature_rejected() -> None:
     assert result == Answer(answer="Fallback structured answer")
 
 
+def test_provider_stops_sending_temperature_after_rejection() -> None:
+    class ModelRejectingTemperature(FakeChatModel):
+        def __init__(self) -> None:
+            super().__init__()
+            self.calls = 0
+
+        def invoke(self, messages, **kwargs):
+            self.calls += 1
+            if "temperature" in kwargs:
+                raise RuntimeError("Unsupported parameter: 'temperature'")
+            return super().invoke(messages, **kwargs)
+
+    chat_model = ModelRejectingTemperature()
+    provider = AzureOpenAIProvider(chat_model=chat_model)
+    messages = [ChatMessage(role="user", content="Hello")]
+
+    provider.invoke(messages, temperature=0.0)
+    provider.invoke(messages, temperature=0.0)
+
+    assert chat_model.calls == 3
+
+
 def test_provider_rejects_missing_azure_settings(monkeypatch) -> None:
     monkeypatch.setattr(
         "app.llm.azure_openai.get_settings",
