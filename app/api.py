@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
+from app.config.instance_settings import settings_for_instance
 from app.config.settings import Settings, get_settings
 from app.contracts.runtime import AgentRequest
 from app.embeddings.factory import create_embedding_provider
@@ -22,7 +23,7 @@ from app.runtime.conversation_store import JsonlConversationStore
 from app.runtime.factory import create_runtime
 from app.vectorstores.factory import create_vector_store
 
-LOCAL_USER_ID = "local-user"
+LOCAL_USER_ID = "local-user-1"
 FRONTEND_DIST = Path(__file__).resolve().parents[1] / "frontend" / "dist"
 PDF_SIGNATURE = b"%PDF-"
 
@@ -50,7 +51,7 @@ class DocumentSummary(BaseModel):
 
 
 def _build_services() -> dict[str, Any]:
-    settings = get_settings()
+    settings = settings_for_instance(get_settings(), "api")
     embeddings = create_embedding_provider(settings)
     vector_store = create_vector_store(settings)
     conversation_store = JsonlConversationStore(settings.conversation_data_path)

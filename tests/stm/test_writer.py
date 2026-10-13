@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+from chromadb.api.types import validate_metadata
+
 from app.embeddings.sentence_transformer import SentenceTransformerEmbeddings
 from app.memory.stm.models import STMMessage
 from app.memory.stm.writer import STMWriter
@@ -27,6 +29,10 @@ def test_stm_writer(tmp_path) -> None:
         role="user",
         content="I prefer Python.",
         timestamp=datetime.now(timezone.utc),
+        metadata={
+            "document_ids": [],
+            "citations": [{"source": "ltm", "metadata": {"version": 1}}],
+        },
     )
 
     writer.write(message)
@@ -50,6 +56,10 @@ def test_stm_writer(tmp_path) -> None:
     assert results[0].content == "I prefer Python."
     assert results[0].metadata["user_id"] == "user_001"
     assert results[0].metadata["thread_id"] == "thread_001"
+    assert results[0].metadata["document_ids"] == "[]"
+    assert results[0].metadata["citations"] == (
+        '[{"metadata":{"version":1},"source":"ltm"}]'
+    )
 
 def test_stm_writer_metadata_cannot_override_identity_fields() -> None:
     class FakeEmbeddings:
@@ -76,6 +86,9 @@ def test_stm_writer_metadata_cannot_override_identity_fields() -> None:
             "user_id": "user_002",
             "thread_id": "thread_002",
             "custom_field": "preserved",
+            "document_ids": [],
+            "citations": [{"source": "ltm", "metadata": {"version": 1}}],
+            "labels": ["important", "recent"],
         },
     )
 
@@ -85,3 +98,9 @@ def test_stm_writer_metadata_cannot_override_identity_fields() -> None:
     assert metadata["user_id"] == "user_001"
     assert metadata["thread_id"] == "thread_001"
     assert metadata["custom_field"] == "preserved"
+    assert metadata["document_ids"] == "[]"
+    assert metadata["citations"] == (
+        '[{"metadata":{"version":1},"source":"ltm"}]'
+    )
+    assert metadata["labels"] == ["important", "recent"]
+    validate_metadata(metadata)

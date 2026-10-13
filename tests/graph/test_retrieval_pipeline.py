@@ -805,3 +805,55 @@ def test_pipeline_stops_after_retry_limit_and_returns_safe_fallback() -> None:
     assert state["cited_item_ids"] == []
     assert state["validation"]["retry_exhausted"] is True
     assert "couldn't verify" in state["answer"]
+
+
+def test_pdf_context_follow_up_routes_to_pdf_without_document_ids() -> None:
+    conversation = Conversation(
+        user_id="user_001",
+        thread_id="thread_pdf",
+        messages=[
+            ConversationMessage(
+                message_id="pdf_instruction",
+                user_id="user_001",
+                thread_id="thread_pdf",
+                role="user",
+                content=(
+                    "I will ask some questions regarding the uploaded pdf. "
+                    "Please answer only based on the pdf"
+                ),
+                timestamp=datetime(2026, 10, 12, 14, 20, tzinfo=timezone.utc),
+            )
+        ],
+    )
+    pdf = FakeRetriever(
+        _result("pdf", "pdf_1", "Rails must be designed for 125 mph wind.")
+    )
+    pipeline = RetrievalPipeline(
+        llm=FakeLLM(
+            analysis=QueryAnalysis(
+                intent="memory_recall",
+                normalized_query="unused",
+            ),
+            plan=RetrievalPlan(),
+            answer_drafts=[
+                AnswerDraft(
+                    answer="The rails must be designed for 125 mph wind.",
+                    cited_item_ids=["pdf_1"],
+                )
+            ],
+        ),
+        conversation_store=FakeConversationStore(conversation),
+        pdf_retriever=pdf,
+    )
+
+    state = pipeline.invoke(
+        user_id="user_001",
+        thread_id="thread_pdf",
+        query="What maximum wind speed must the vibration isolation rails be designed for?",
+    )
+
+    assert state["prefer_pdf_context"] is True
+    assert state["query_analysis"].intent == "document_question"
+    assert state["retrieval_plan"].use_pdf is True
+    assert pdf.calls == 1
+    assert state["answer"] == "The rails must be designed for 125 mph wind."

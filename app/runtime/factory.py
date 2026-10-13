@@ -18,11 +18,13 @@ from app.memory.ltm.writer import LTMWriter
 from app.memory.stm.episodic_retriever import STMEpisodicRetriever
 from app.memory.stm.retriever import STMRetriever
 from app.memory.stm.writer import STMWriter
+from app.observability.tracker import ObservabilityTracker
 from app.graph.reranker import Reranker
 from app.rag.pdf_retriever import PDFRetriever
 from app.runtime.agent import AgentRuntime
 from app.runtime.conversation_store import JsonlConversationStore
 from app.tracing.exporters import (
+    AgentTimingExporter,
     CompositeTraceExporter,
     JsonlTraceExporter,
     TextTraceExporter,
@@ -40,11 +42,13 @@ def create_runtime(
     conversation_store: ConversationStore | None = None,
     pdf_retriever: Any | None = None,
     reranker: Reranker | None = None,
+    tracker: ObservabilityTracker | None = None,
 ) -> AgentRuntime:
     settings = settings or get_settings()
     embeddings = embeddings or create_embedding_provider(settings)
     vector_store = vector_store or create_vector_store(settings)
     llm = llm or AzureOpenAIProvider()
+    tracker = tracker or ObservabilityTracker()
     conversation_store = conversation_store or JsonlConversationStore(
         settings.conversation_data_path
     )
@@ -103,6 +107,7 @@ def create_runtime(
         pdf_top_k=settings.pdf_top_k,
         max_context_tokens=settings.max_context_tokens,
         max_retries=settings.max_retries,
+        tracker=tracker,
         trace_sink=CompositeTraceExporter(
             [
                 JsonlTraceExporter(settings.trace_data_path),
@@ -117,4 +122,7 @@ def create_runtime(
         stm_writer=stm_writer,
         ltm_extractor=ltm_extractor,
         ltm_manager=ltm_manager,
+        tracker=tracker,
+        timing_sink=AgentTimingExporter(settings.trace_data_path),
+        background_memory_writes=settings.background_memory_writes,
     )

@@ -23,6 +23,33 @@ class JsonlTraceExporter:
         self.emit(trace)
 
 
+class AgentTimingExporter:
+    """Append full per-request runtime timing breakdowns as JSONL."""
+
+    def __init__(self, root_path: str | Path) -> None:
+        self.root_path = Path(root_path)
+        self.root_path.mkdir(parents=True, exist_ok=True)
+        self.path = self.root_path / "agent_timings.jsonl"
+
+    def emit(
+        self,
+        *,
+        trace_id: str,
+        user_id: str,
+        thread_id: str,
+        timings: dict[str, dict[str, float | int]],
+    ) -> None:
+        payload = {
+            "trace_id": trace_id,
+            "user_id": user_id,
+            "thread_id": thread_id,
+            "timings_ms": timings,
+        }
+        with self.path.open("a", encoding="utf-8") as file:
+            file.write(json.dumps(payload, ensure_ascii=False))
+            file.write("\n")
+
+
 class TextTraceExporter:
     """Append a compact, human-readable summary for each graph trace."""
 
@@ -42,6 +69,14 @@ class TextTraceExporter:
 
     @classmethod
     def _render(cls, payload: dict[str, Any]) -> str:
+        metadata = payload.get("metadata", {})
+        if not isinstance(metadata, dict):
+            metadata = {}
+        trace_metadata = {
+            key: value
+            for key, value in metadata.items()
+            if key != "stage_timings_ms"
+        }
         lines = [
             "=" * 72,
             f"Trace: {payload.get('trace_id', 'unknown')}",
@@ -68,8 +103,25 @@ class TextTraceExporter:
             "Validation:",
             f"  {cls._inline_mapping(payload.get('validation', {}))}",
             "Metadata:",
-            f"  {cls._inline_mapping(payload.get('metadata', {}))}",
+            f"  {cls._inline_mapping(trace_metadata)}",
         ]
+        stage_timings = metadata.get("stage_timings_ms", {})
+        if isinstance(stage_timings, dict) and stage_timings:
+            lines.extend(
+                [
+                    "",
+                    "Agent stage timings (overlapping spans; do not sum):",
+                    *[
+                        (
+                            f"  {name}: count={values.get('count', 0)}, "
+                            f"total_ms={float(values.get('total_ms', 0.0)):.2f}, "
+                            f"max_ms={float(values.get('max_ms', 0.0)):.2f}"
+                        )
+                        for name, values in sorted(stage_timings.items())
+                        if isinstance(values, dict)
+                    ],
+                ]
+            )
         return "\n".join(lines)
 
     @staticmethod

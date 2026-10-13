@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from app.contracts.runtime import (
     AgentRequest,
+    AgentResponse,
 )
 from app.contracts.retrieval import RetrievedItem
 from app.contracts.routing import RetrievalPlan
@@ -31,7 +32,7 @@ def test_runtime_executes_phase0_graph(
     request = AgentRequest(
         user_id="user_001",
         thread_id="thread_001",
-        message="Hello",
+        message="What can you do?",
     )
 
     response = runtime.handle(request)
@@ -49,9 +50,112 @@ def test_runtime_executes_phase0_graph(
     assert len(conversation.messages) == 2
 
     assert conversation.messages[0].role == "user"
-    assert conversation.messages[0].content == "Hello"
+    assert conversation.messages[0].content == "What can you do?"
 
     assert conversation.messages[1].role == "assistant"
+
+
+def test_runtime_skips_stm_embedding_for_greeting_messages(tmp_path) -> None:
+    class CountingSTMWriter:
+        def __init__(self) -> None:
+            self.messages = []
+
+        def write(self, message) -> None:
+            self.messages.append(message)
+
+    class GreetingGraph:
+        def run(self, request, trace_id) -> AgentResponse:
+            return AgentResponse(
+                user_id=request.user_id,
+                thread_id=request.thread_id,
+                answer="Hi! How can I help you today?",
+                trace_id=trace_id,
+            )
+
+    writer = CountingSTMWriter()
+    runtime = AgentRuntime(
+        conversation_store=JsonlConversationStore(tmp_path),
+        graph=GreetingGraph(),
+        stm_writer=writer,
+    )
+
+    runtime.handle(
+        AgentRequest(
+            user_id="user_001",
+            thread_id="thread_001",
+            message="Hi Stan!",
+        )
+    )
+
+    assert writer.messages == []
+
+
+def test_runtime_uses_fast_path_for_greeting_messages(tmp_path) -> None:
+    class UnexpectedGraph:
+        def run(self, request, trace_id):
+            raise AssertionError("Greeting should not execute the graph")
+
+    runtime = AgentRuntime(
+        conversation_store=JsonlConversationStore(tmp_path),
+        graph=UnexpectedGraph(),
+    )
+
+    response = runtime.handle(
+        AgentRequest(
+            user_id="user_001",
+            thread_id="thread_001",
+            message="Hello",
+        )
+    )
+
+    conversation = runtime.conversation_store.load("user_001", "thread_001")
+    timings = response.metadata["agent_timings"]
+
+    assert response.answer == "Hi! How can I help you today?"
+    assert response.metadata["fast_path"] == "small_talk"
+    assert "agent.graph_execution" not in timings
+    assert [message.role for message in conversation.messages] == [
+        "user",
+        "assistant",
+    ]
+
+
+def test_runtime_captures_short_profile_facts_for_ltm(tmp_path) -> None:
+    class NoopGraph:
+        def run(self, request, trace_id) -> AgentResponse:
+            return AgentResponse(
+                user_id=request.user_id,
+                thread_id=request.thread_id,
+                answer="Noted.",
+                trace_id=trace_id,
+            )
+
+    class RecordingExtractor:
+        conversations = []
+
+        def extract(self, conversation):
+            self.conversations.append(conversation)
+            return []
+
+    extractor = RecordingExtractor()
+    runtime = AgentRuntime(
+        conversation_store=JsonlConversationStore(tmp_path),
+        graph=NoopGraph(),
+        ltm_extractor=extractor,
+        ltm_manager=object(),
+        background_memory_writes=False,
+    )
+
+    runtime.handle(
+        AgentRequest(
+            user_id="user_001",
+            thread_id="thread_001",
+            message="My age is 23",
+        )
+    )
+
+    assert extractor.conversations
+    assert extractor.conversations[0].messages[0].content == "My age is 23"
 
 
 class FakeEmbeddings:
@@ -184,11 +288,19 @@ def test_runtime_executes_stm_ltm_graph_and_persists_messages(tmp_path) -> None:
             message="What did we discuss about the database?",
         )
     )
+    runtime.wait_for_background_tasks()
 
     conversation = conversation_store.load("user_001", "thread_001")
     assert response.answer == "We discussed Chroma."
     assert response.trace_id
     assert response.metadata["citations"][0]["item_id"] == "seed_message"
+    timings = response.metadata["agent_timings"]
+    assert timings["agent.total"]["total_ms"] > 0
+    assert timings["agent.graph_execution"]["total_ms"] > 0
+    assert timings["query_analysis"]["total_ms"] > 0
+    assert timings["retrieval_planning"]["total_ms"] > 0
+    assert timings["answer_generation"]["total_ms"] > 0
+    assert timings["answer_validation"]["total_ms"] > 0
     assert len(conversation.messages) == 2
     assert [message.role for message in conversation.messages] == [
         "user",
@@ -213,3 +325,22 @@ def test_runtime_executes_stm_ltm_graph_and_persists_messages(tmp_path) -> None:
     assert trace_record["trace_id"] == response.trace_id
     assert "seed_message" in trace_record["stm"]["retrieved_ids"]
     assert trace_record["answer"]["cited_item_ids"] == ["seed_message"]
+    trace_timings = trace_record["metadata"]["stage_timings_ms"]
+    assert trace_timings["query_analysis"]["total_ms"] > 0
+    assert trace_timings["agent.conversation_load"]["total_ms"] > 0
+    assert "llm.structured_output" not in trace_timings
+    agent_timing_record = __import__("json").loads(
+        (tmp_path / "traces" / "agent_timings.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()[0]
+    )
+    assert agent_timing_record["trace_id"] == response.trace_id
+    assert agent_timing_record["timings_ms"]["agent.total"]["total_ms"] > 0
+    assert (
+        agent_timing_record["timings_ms"]["agent.graph_execution"]["total_ms"]
+        > 0
+    )
+    text_trace = (tmp_path / "traces" / "traces.txt").read_text(
+        encoding="utf-8"
+    )
+    assert "Agent stage timings (overlapping spans; do not sum)" in text_trace

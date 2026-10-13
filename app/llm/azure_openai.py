@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+import time
 from typing import Any, TypeVar
 
 from langchain_core.callbacks import BaseCallbackHandler
@@ -10,6 +11,7 @@ from pydantic import BaseModel
 from app.config.settings import get_settings
 from app.contracts.errors import ConfigurationError, ContractError, LLMError
 from app.llm.provider import ChatMessage, LLMResponse
+from app.observability.tracker import record_current_timing
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -64,6 +66,7 @@ class AzureOpenAIProvider:
         *,
         temperature: float | None = None,
     ) -> LLMResponse:
+        started = time.perf_counter()
         try:
             try:
                 response = self.chat_model.invoke(
@@ -100,6 +103,11 @@ class AzureOpenAIProvider:
             raise
         except Exception as exc:
             raise LLMError("Azure OpenAI invocation failed") from exc
+        finally:
+            record_current_timing(
+                "llm.invoke",
+                (time.perf_counter() - started) * 1000,
+            )
 
     def structured_output(
         self,
@@ -108,6 +116,7 @@ class AzureOpenAIProvider:
         *,
         temperature: float | None = None,
     ) -> T:
+        started = time.perf_counter()
         try:
             try:
                 structured_model = self.chat_model.with_structured_output(
@@ -142,6 +151,11 @@ class AzureOpenAIProvider:
             raise LLMError(
                 "Azure OpenAI structured output failed"
             ) from exc
+        finally:
+            record_current_timing(
+                "llm.structured_output",
+                (time.perf_counter() - started) * 1000,
+            )
 
     @staticmethod
     def _temperature_kwargs(

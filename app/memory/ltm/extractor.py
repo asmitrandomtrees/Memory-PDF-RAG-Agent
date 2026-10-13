@@ -32,6 +32,21 @@ class LTMExtractor:
     ) -> None:
         self.llm = llm
 
+    @staticmethod
+    def _is_trivial_user_message(message: ConversationMessage) -> bool:
+        content = message.content.strip().lower()
+        if not content:
+            return True
+
+        tokens = [token for token in content.split() if token]
+        if len(tokens) <= 3 and (
+            content in {"hi", "hello", "hey", "thanks", "thank you", "ok", "okay"}
+            or content.startswith(("hi ", "hello ", "hey "))
+        ):
+            return True
+
+        return False
+
     def extract(
         self,
         conversation: Conversation,
@@ -47,6 +62,9 @@ class LTMExtractor:
         ]
 
         if not messages:
+            return []
+
+        if all(self._is_trivial_user_message(message) for message in messages):
             return []
 
         conversation_text = self._build_conversation_text(

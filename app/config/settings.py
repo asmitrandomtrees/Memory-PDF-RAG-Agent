@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     # Agent
     max_retries: int = Field(2, alias="MAX_RETRIES", ge=0)
     max_context_tokens: int = Field(6000, alias="MAX_CONTEXT_TOKENS", ge=1)
+    background_memory_writes: bool = Field(
+        True,
+        alias="BACKGROUND_MEMORY_WRITES",
+    )
 
 
 @lru_cache

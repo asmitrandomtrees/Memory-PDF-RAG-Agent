@@ -15,6 +15,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.api import ChatRequest, DocumentSummary, PDF_SIGNATURE
 from app.config.settings import Settings, get_settings
+from app.config.instance_settings import settings_for_instance
 from app.contracts.runtime import AgentRequest
 from app.embeddings.factory import create_embedding_provider
 from app.rag.pdf_ingest import document_id_for, ingest_pdf
@@ -157,12 +158,13 @@ class UserProfileStore:
 
 
 def _build_services() -> dict[str, Any]:
-    settings = get_settings()
+    settings = settings_for_instance(get_settings(), "api_multiuser")
     embeddings = create_embedding_provider(settings)
     vector_store = create_vector_store(settings)
-    # Dedicated database for this fresh backend; the previous database is untouched.
     user_store = UserProfileStore(
-        Path(settings.conversation_data_path) / "user_profiles_fresh.sqlite3"
+        Path(settings.conversation_data_path).parent
+        / "db"
+        / "user_profiles.sqlite3"
     )
     conversation_store = JsonlConversationStore(settings.conversation_data_path)
     upload_root = Path(settings.pdf_upload_path).resolve()

@@ -1,9 +1,37 @@
 from contextlib import contextmanager
+from contextvars import ContextVar, Token
 from functools import wraps
 import time
 from typing import Any, Callable, Iterator
 
 from app.observability.metrics import MetricsRegistry, get_metrics_registry
+
+_request_timings: ContextVar[dict[str, dict[str, float | int]] | None] = (
+    ContextVar("agent_request_timings", default=None)
+)
+
+
+def record_current_timing(stage_name: str, duration_ms: float) -> None:
+    timings = _request_timings.get()
+    if timings is None:
+        return
+    stage = timings.setdefault(
+        stage_name,
+        {"count": 0, "total_ms": 0.0, "max_ms": 0.0},
+    )
+    stage["count"] = int(stage["count"]) + 1
+    stage["total_ms"] = float(stage["total_ms"]) + duration_ms
+    stage["max_ms"] = max(float(stage["max_ms"]), duration_ms)
+
+
+def current_request_timing_snapshot() -> dict[str, dict[str, float | int]]:
+    timings = _request_timings.get()
+    if timings is None:
+        return {}
+    return {
+        name: dict(values)
+        for name, values in timings.items()
+    }
 
 
 class ObservabilityTracker:
@@ -11,6 +39,19 @@ class ObservabilityTracker:
 
     def __init__(self, registry: MetricsRegistry | None = None) -> None:
         self.registry = registry or get_metrics_registry()
+
+    @contextmanager
+    def collect_request_timings(
+        self,
+    ) -> Iterator[dict[str, dict[str, float | int]]]:
+        timings: dict[str, dict[str, float | int]] = {}
+        token: Token[dict[str, dict[str, float | int]] | None] = (
+            _request_timings.set(timings)
+        )
+        try:
+            yield timings
+        finally:
+            _request_timings.reset(token)
 
     @contextmanager
     def track_latency(self, stage_name: str) -> Iterator[dict[str, Any]]:
@@ -27,6 +68,7 @@ class ObservabilityTracker:
             duration_ms = (time.perf_counter() - context["start_time"]) * 1000.0
             context["duration_ms"] = duration_ms
             self.registry.record_latency(stage_name, duration_ms)
+            record_current_timing(stage_name, duration_ms)
 
     def track_llm_call(
         self,

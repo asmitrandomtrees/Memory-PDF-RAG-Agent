@@ -25,6 +25,7 @@ from app.graph.reranker import ReciprocalRankFusionReranker, Reranker
 from app.memory.stm.context_budget import STMContextBudget
 from app.memory.stm.summarizer import STMContextSummarizer
 from app.observability.tracker import ObservabilityTracker
+from app.observability.tracker import current_request_timing_snapshot
 from app.tracing.tracer import TraceSink
 
 
@@ -306,19 +307,26 @@ class RetrievalPipeline:
                 "latency_ms": latency_ms,
                 "retry_count": state.get("retry_count", 0),
                 "retrieval_errors": state.get("retrieval_errors", {}),
+                "stage_timings_ms": current_request_timing_snapshot(),
             },
         )
 
     def _analyze(self, state: GraphState) -> dict[str, Any]:
         with self.tracker.track_latency("query_analysis"):
             query = state.get("rewritten_query") or state["query"]
-            analysis = self.analyzer.analyze(query)
+            prefer_pdf = self._thread_prefers_pdf_context(state)
+            analysis = self.analyzer.analyze(
+                query,
+                document_ids=state.get("document_ids", []),
+                prefer_pdf=prefer_pdf,
+            )
             start_at, end_at = resolve_calendar_day(analysis)
             return {
                 "query_analysis": analysis,
                 "rewritten_query": analysis.normalized_query,
                 "date_start_at": start_at,
                 "date_end_at": end_at,
+                "prefer_pdf_context": prefer_pdf,
             }
 
     def _plan(self, state: GraphState) -> dict[str, Any]:
@@ -328,6 +336,8 @@ class RetrievalPipeline:
                 "retrieval_plan": self.planner.plan(
                     query=query,
                     analysis=state["query_analysis"],
+                    document_ids=state.get("document_ids", []),
+                    prefer_pdf=bool(state.get("prefer_pdf_context", False)),
                 ),
                 "merged_results": None,
                 "reranked_results": None,
@@ -461,6 +471,26 @@ class RetrievalPipeline:
                 "retry_exhausted": True,
             },
         }
+
+    @staticmethod
+    def _thread_prefers_pdf_context(state: GraphState) -> bool:
+        if state.get("document_ids"):
+            return True
+
+        markers = (
+            "uploaded pdf",
+            "uploaded document",
+            "based on the pdf",
+            "based only on the pdf",
+            "only based on the pdf",
+            "answer using the retrieved project specification documents",
+            "using only information from that pdf",
+        )
+        for item in state.get("recent_items", []):
+            content = item.content.lower()
+            if any(marker in content for marker in markers):
+                return True
+        return False
 
     def _recent_thread_items(
         self,

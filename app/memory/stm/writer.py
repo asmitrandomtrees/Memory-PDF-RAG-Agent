@@ -1,9 +1,35 @@
+import json
+from datetime import timezone
+from typing import Any
+
 from app.contracts.errors import MemoryError
 from app.embeddings.sentence_transformer import SentenceTransformerEmbeddings
 from app.memory.stm.models import STMMessage
 from app.vectorstores.chroma import ChromaVectorStore
 
-from datetime import timezone
+
+def _serialize_chroma_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    serialized: dict[str, Any] = {}
+    scalar_types = (str, int, float, bool)
+    for key, value in metadata.items():
+        if value is None or type(value) in scalar_types:
+            serialized[key] = value
+        elif (
+            isinstance(value, list)
+            and value
+            and type(value[0]) in scalar_types
+            and all(type(item) is type(value[0]) for item in value)
+        ):
+            serialized[key] = value
+        else:
+            serialized[key] = json.dumps(
+                value,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+    return serialized
+
 
 class STMWriter:
     def __init__(
@@ -32,7 +58,7 @@ class STMWriter:
             else:
                 timestamp = timestamp.astimezone(timezone.utc)
 
-            metadata = dict(message.metadata)
+            metadata = _serialize_chroma_metadata(message.metadata)
             metadata.update({
                 "source": "stm",
                 "user_id": message.user_id,

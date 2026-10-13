@@ -21,6 +21,7 @@ class GraphState(TypedDict, total=False):
     date_start_at: datetime | None
     date_end_at: datetime | None
     recent_items: list[RetrievedItem]
+    prefer_pdf_context: bool
 
     retrieval_plan: RetrievalPlan
 

@@ -7,6 +7,7 @@ from app.contracts.routing import RetrievalPlan
 from app.graph.schemas import INDIA_TIMEZONE, QueryAnalysis
 from app.llm.prompts import render_chat_prompt
 from app.llm.provider import LLMProvider
+from app.runtime.agent import is_trivial_small_talk
 
 
 _ANALYSIS_PROMPT = ChatPromptTemplate.from_messages(
@@ -47,7 +48,33 @@ class QueryAnalyzer:
     def __init__(self, llm: LLMProvider) -> None:
         self.llm = llm
 
-    def analyze(self, query: str) -> QueryAnalysis:
+    def analyze(
+        self,
+        query: str,
+        *,
+        document_ids: list[str] | None = None,
+        prefer_pdf: bool = False,
+    ) -> QueryAnalysis:
+        document_ids = document_ids or []
+        if is_trivial_small_talk(query):
+            return QueryAnalysis(
+                intent="general",
+                normalized_query=query.strip() or "hello",
+            )
+        if (document_ids or prefer_pdf) and _looks_like_standalone_general_query(
+            query
+        ):
+            return QueryAnalysis(
+                intent="document_question",
+                normalized_query=query.strip(),
+                document_ids=document_ids,
+            )
+        if not document_ids and _looks_like_standalone_general_query(query):
+            return QueryAnalysis(
+                intent="general",
+                normalized_query=query.strip(),
+            )
+
         today_ist = datetime.now(INDIA_TIMEZONE).date().isoformat()
         return self.llm.structured_output(
             render_chat_prompt(
@@ -69,7 +96,28 @@ class RetrievalPlanner:
         *,
         query: str,
         analysis: QueryAnalysis,
+        document_ids: list[str] | None = None,
+        prefer_pdf: bool = False,
     ) -> RetrievalPlan:
+        document_ids = document_ids or analysis.document_ids
+        if (document_ids or prefer_pdf) and analysis.intent == "document_question":
+            return RetrievalPlan(
+                use_pdf=True,
+                metadata={
+                    "reason": (
+                        "selected_documents"
+                        if document_ids
+                        else "thread_pdf_context"
+                    )
+                },
+            )
+        if (
+            analysis.intent == "general"
+            and not prefer_pdf
+            and not _looks_like_contextual_follow_up(query)
+        ):
+            return RetrievalPlan(use_stm=False, use_ltm=False, use_pdf=False)
+
         plan = self.llm.structured_output(
             render_chat_prompt(
                 _PLANNING_PROMPT,
@@ -82,6 +130,8 @@ class RetrievalPlanner:
 
         if analysis.intent == "episodic_recall" and not plan.use_stm:
             return plan.model_copy(update={"use_stm": True})
+        if (document_ids or prefer_pdf) and not plan.use_pdf:
+            return plan.model_copy(update={"use_pdf": True})
         if _looks_like_contextual_follow_up(query) and not plan.use_stm:
             return plan.model_copy(update={"use_stm": True})
         return plan
@@ -104,18 +154,6 @@ _FOLLOW_UP_TERMS = {
     "no",
 }
 
-_STANDALONE_SMALL_TALK = {
-    "hello",
-    "hey",
-    "hi",
-    "hii",
-    "thanks",
-    "thank",
-    "okay",
-    "ok",
-}
-
-
 def _looks_like_contextual_follow_up(query: str) -> bool:
     normalized = query.strip().lower()
     if not normalized:
@@ -125,7 +163,7 @@ def _looks_like_contextual_follow_up(query: str) -> bool:
     if not tokens:
         return False
 
-    if set(tokens) <= _STANDALONE_SMALL_TALK:
+    if is_trivial_small_talk(query):
         return False
 
     token_set = set(tokens)
@@ -139,3 +177,59 @@ def _looks_like_contextual_follow_up(query: str) -> bool:
         return True
 
     return False
+
+
+_RETRIEVAL_CUE_TERMS = {
+    "document",
+    "documents",
+    "file",
+    "files",
+    "i",
+    "me",
+    "memory",
+    "my",
+    "our",
+    "pdf",
+    "previous",
+    "remember",
+    "said",
+    "source",
+    "told",
+    "uploaded",
+    "we",
+}
+
+_GENERAL_QUERY_STARTS = {
+    "can",
+    "could",
+    "define",
+    "explain",
+    "how",
+    "list",
+    "should",
+    "tell",
+    "what",
+    "when",
+    "where",
+    "which",
+    "who",
+    "why",
+}
+
+
+def _looks_like_standalone_general_query(query: str) -> bool:
+    normalized = query.strip().lower()
+    if not normalized:
+        return False
+
+    tokens = re.findall(r"[a-z0-9']+", normalized)
+    if not tokens:
+        return False
+
+    if _looks_like_contextual_follow_up(query):
+        return False
+
+    if set(tokens) & _RETRIEVAL_CUE_TERMS:
+        return False
+
+    return tokens[0] in _GENERAL_QUERY_STARTS

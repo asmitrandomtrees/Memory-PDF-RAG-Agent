@@ -52,13 +52,3 @@ npm run dev
 
 Open `http://127.0.0.1:5173`. The Vite development server proxies API requests
 to the backend on port 8000.
-
-To serve the built frontend from FastAPI instead, build it and start the API:
-
-```bash
-cd frontend
-npm install
-npm run build
-cd ..
-python -m uvicorn app.api:app --host 127.0.0.1 --port 8000
-```

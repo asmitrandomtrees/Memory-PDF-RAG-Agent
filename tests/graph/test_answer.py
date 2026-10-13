@@ -28,6 +28,14 @@ class PromptCaptureLLM:
         return AnswerDraft(answer="Saturday works for a Hindi thriller.")
 
 
+class UnexpectedCallLLM:
+    def structured_output(self, messages, output_schema, *, temperature=None):
+        raise AssertionError("Small talk should not call the LLM")
+
+    def invoke(self, messages, *, temperature=None):
+        raise AssertionError("Small talk should not call the LLM")
+
+
 def test_answer_prompt_limits_follow_up_questions_and_option_menus() -> None:
     llm = PromptCaptureLLM()
 
@@ -39,6 +47,16 @@ def test_answer_prompt_limits_follow_up_questions_and_option_menus() -> None:
     system_prompt = llm.messages[0].content
     assert "Ask at most one follow-up question" in system_prompt
     assert "Do not end routine replies with menus" in system_prompt
+
+
+def test_answer_generator_handles_greeting_with_name_without_llm() -> None:
+    draft = AnswerGenerator(UnexpectedCallLLM()).generate(
+        query="Hi Stan!",
+        context=AgentContext(),
+    )
+
+    assert draft.answer == "Hi! How can I help you today?"
+    assert draft.cited_item_ids == []
 
 
 def test_answer_generator_falls_back_to_plain_chat_for_invalid_tool_output() -> None:
@@ -92,7 +110,8 @@ def test_validator_keeps_answer_available_when_model_validation_fails() -> None:
     )
 
     assert validation.is_valid is True
-    assert "unavailable" in (validation.reason or "")
+    assert "Validated locally" in (validation.reason or "")
+    assert llm.structured_calls == 0
 
 
 def test_validator_accepts_original_ids_referenced_by_stm_summary() -> None:

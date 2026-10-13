@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from app.contracts.errors import ConfigurationError, ContractError, LLMError
 from app.llm.azure_openai import AzureOpenAIProvider
 from app.llm.provider import ChatMessage, LLMResponse
+from app.observability.tracker import ObservabilityTracker
 
 
 class FakeStructuredModel:
@@ -98,6 +99,20 @@ def test_structured_output_returns_requested_pydantic_model() -> None:
     assert chat_model.output_schema is Answer
     assert isinstance(chat_model.structured_model.messages[0], HumanMessage)
     assert chat_model.structured_model.kwargs == {"temperature": 0.0}
+
+
+def test_llm_call_latency_is_recorded_in_request_timings() -> None:
+    provider = AzureOpenAIProvider(chat_model=FakeChatModel())
+    tracker = ObservabilityTracker()
+
+    with tracker.collect_request_timings() as timings:
+        provider.structured_output(
+            [ChatMessage(role="user", content="Return an answer")],
+            Answer,
+        )
+
+    assert timings["llm.structured_output"]["count"] == 1
+    assert timings["llm.structured_output"]["total_ms"] > 0
 
 
 def test_invoke_rejects_unsupported_message_role() -> None:
