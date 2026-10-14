@@ -28,14 +28,6 @@ class PromptCaptureLLM:
         return AnswerDraft(answer="Saturday works for a Hindi thriller.")
 
 
-class UnexpectedCallLLM:
-    def structured_output(self, messages, output_schema, *, temperature=None):
-        raise AssertionError("Small talk should not call the LLM")
-
-    def invoke(self, messages, *, temperature=None):
-        raise AssertionError("Small talk should not call the LLM")
-
-
 def test_answer_prompt_limits_follow_up_questions_and_option_menus() -> None:
     llm = PromptCaptureLLM()
 
@@ -49,14 +41,16 @@ def test_answer_prompt_limits_follow_up_questions_and_option_menus() -> None:
     assert "Do not end routine replies with menus" in system_prompt
 
 
-def test_answer_generator_handles_greeting_with_name_without_llm() -> None:
-    draft = AnswerGenerator(UnexpectedCallLLM()).generate(
+def test_answer_generator_uses_llm_for_greeting() -> None:
+    llm = PromptCaptureLLM()
+    draft = AnswerGenerator(llm).generate(
         query="Hi Stan!",
         context=AgentContext(),
     )
 
-    assert draft.answer == "Hi! How can I help you today?"
+    assert draft.answer == "Saturday works for a Hindi thriller."
     assert draft.cited_item_ids == []
+    assert llm.messages[0].content
 
 
 def test_answer_generator_falls_back_to_plain_chat_for_invalid_tool_output() -> None:

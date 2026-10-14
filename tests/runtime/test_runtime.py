@@ -55,7 +55,7 @@ def test_runtime_executes_phase0_graph(
     assert conversation.messages[1].role == "assistant"
 
 
-def test_runtime_skips_stm_embedding_for_greeting_messages(tmp_path) -> None:
+def test_runtime_indexes_greeting_messages_normally(tmp_path) -> None:
     class CountingSTMWriter:
         def __init__(self) -> None:
             self.messages = []
@@ -68,7 +68,7 @@ def test_runtime_skips_stm_embedding_for_greeting_messages(tmp_path) -> None:
             return AgentResponse(
                 user_id=request.user_id,
                 thread_id=request.thread_id,
-                answer="Hi! How can I help you today?",
+                answer="Hello from the normal graph response.",
                 trace_id=trace_id,
             )
 
@@ -77,27 +77,42 @@ def test_runtime_skips_stm_embedding_for_greeting_messages(tmp_path) -> None:
         conversation_store=JsonlConversationStore(tmp_path),
         graph=GreetingGraph(),
         stm_writer=writer,
+        background_memory_writes=False,
     )
 
-    runtime.handle(
+    response = runtime.handle(
         AgentRequest(
             user_id="user_001",
             thread_id="thread_001",
-            message="Hi Stan!",
+            message="Hello",
         )
     )
 
-    assert writer.messages == []
+    assert response.answer == "Hello from the normal graph response."
+    assert len(writer.messages) == 2
+    assert [message.role for message in writer.messages] == [
+        "user",
+        "assistant",
+    ]
 
 
-def test_runtime_uses_fast_path_for_greeting_messages(tmp_path) -> None:
-    class UnexpectedGraph:
+def test_runtime_executes_graph_for_greeting_messages(tmp_path) -> None:
+    class GreetingGraph:
+        called = False
+
         def run(self, request, trace_id):
-            raise AssertionError("Greeting should not execute the graph")
+            self.called = True
+            return AgentResponse(
+                user_id=request.user_id,
+                thread_id=request.thread_id,
+                answer="Generated greeting from the graph.",
+                trace_id=trace_id,
+            )
 
+    graph = GreetingGraph()
     runtime = AgentRuntime(
         conversation_store=JsonlConversationStore(tmp_path),
-        graph=UnexpectedGraph(),
+        graph=graph,
     )
 
     response = runtime.handle(
@@ -111,9 +126,10 @@ def test_runtime_uses_fast_path_for_greeting_messages(tmp_path) -> None:
     conversation = runtime.conversation_store.load("user_001", "thread_001")
     timings = response.metadata["agent_timings"]
 
-    assert response.answer == "Hi! How can I help you today?"
-    assert response.metadata["fast_path"] == "small_talk"
-    assert "agent.graph_execution" not in timings
+    assert response.answer == "Generated greeting from the graph."
+    assert graph.called
+    assert "fast_path" not in response.metadata
+    assert timings["agent.graph_execution"]["total_ms"] > 0
     assert [message.role for message in conversation.messages] == [
         "user",
         "assistant",
@@ -156,6 +172,58 @@ def test_runtime_captures_short_profile_facts_for_ltm(tmp_path) -> None:
 
     assert extractor.conversations
     assert extractor.conversations[0].messages[0].content == "My age is 23"
+
+
+def test_named_self_introduction_uses_graph_and_captures_ltm_in_background(
+    tmp_path,
+) -> None:
+    class RecordingGraph:
+        called = False
+
+        def run(self, request, trace_id):
+            self.called = True
+            return AgentResponse(
+                user_id=request.user_id,
+                thread_id=request.thread_id,
+                answer="Nice to meet you, Michael.",
+                trace_id=trace_id,
+            )
+
+    class RecordingExtractor:
+        def __init__(self) -> None:
+            self.conversations = []
+
+        def extract(self, conversation):
+            self.conversations.append(conversation)
+            return []
+
+    extractor = RecordingExtractor()
+    graph = RecordingGraph()
+    runtime = AgentRuntime(
+        conversation_store=JsonlConversationStore(tmp_path),
+        graph=graph,
+        ltm_extractor=extractor,
+        ltm_manager=object(),
+        background_memory_writes=True,
+    )
+
+    response = runtime.handle(
+        AgentRequest(
+            user_id="user_001",
+            thread_id="thread_001",
+            message="Hi, I am Michael",
+        )
+    )
+    runtime.wait_for_background_tasks()
+
+    assert response.answer == "Nice to meet you, Michael."
+    assert graph.called
+    assert "fast_path" not in response.metadata
+    assert len(extractor.conversations) == 1
+    assert (
+        extractor.conversations[0].messages[0].content
+        == "Hi, I am Michael"
+    )
 
 
 class FakeEmbeddings:

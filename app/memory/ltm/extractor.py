@@ -52,6 +52,12 @@ _REMEMBER_RE = re.compile(
     r"^remember(?:\s+that)?\s+(?P<value>.+)$",
     re.IGNORECASE,
 )
+_NAME_INTRODUCTION_RE = re.compile(
+    r"^(?:(?:hi|hello|hey|hii),?\s+)?"
+    r"(?:(?:i\s+am|i'm)|(?:my\s+name\s+is))\s+"
+    r"(?P<value>.+)$",
+    re.IGNORECASE,
+)
 
 _TRANSIENT_I_AM_PREFIXES = (
     "asking",
@@ -212,6 +218,14 @@ class LTMExtractor:
         if candidate is not None:
             return candidate
 
+        candidate = cls._extract_name_introduction(
+            conversation=conversation,
+            message=message,
+            content=normalized,
+        )
+        if candidate is not None:
+            return candidate
+
         candidate = cls._extract_i_am_profile(
             conversation=conversation,
             message=message,
@@ -301,6 +315,34 @@ class LTMExtractor:
         )
 
     @classmethod
+    def _extract_name_introduction(
+        cls,
+        *,
+        conversation: Conversation,
+        message: ConversationMessage,
+        content: str,
+    ) -> CandidateMemory | None:
+        match = _NAME_INTRODUCTION_RE.match(content)
+        if not match:
+            return None
+
+        value = cls._clean_rule_value(match.group("value"))
+        if value is None or not cls._looks_like_name_value(value):
+            return None
+
+        return cls._candidate(
+            conversation=conversation,
+            message=message,
+            memory_type="profile",
+            content=f"User's name is {value}.",
+            confidence=0.96,
+            metadata={
+                "extraction_method": "rule_based",
+                "attribute": "name",
+            },
+        )
+
+    @classmethod
     def _extract_i_am_profile(
         cls,
         *,
@@ -368,6 +410,16 @@ class LTMExtractor:
             return None
 
         return cleaned
+
+    @staticmethod
+    def _looks_like_name_value(value: str) -> bool:
+        words = value.split()
+        if not 1 <= len(words) <= 3:
+            return False
+        return all(
+            re.fullmatch(r"[A-Z][A-Za-z'-]*", word) is not None
+            for word in words
+        )
 
     @staticmethod
     def _candidate(

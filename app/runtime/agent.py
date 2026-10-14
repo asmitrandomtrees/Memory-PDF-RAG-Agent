@@ -16,7 +16,6 @@ from app.memory.stm.models import STMMessage
 from app.memory.stm.writer import STMWriter
 from app.observability.tracker import ObservabilityTracker
 from app.runtime.session import AgentSession
-from app.runtime.text_utils import is_trivial_small_talk, small_talk_reply
 
 
 _DURABLE_PROFILE_PATTERNS = (
@@ -118,15 +117,6 @@ class AgentRuntime:
         with self.tracker.track_latency("agent.persist_user_message"):
             self.conversation_store.append_message(user_message)
 
-        runtime_errors: dict[str, str] = {}
-        if is_trivial_small_talk(request.message):
-            return self._handle_small_talk(
-                request=request,
-                trace_id=trace_id,
-                session=session,
-                runtime_errors=runtime_errors,
-            )
-
         with self.tracker.track_latency("agent.graph_execution"):
             response = self.graph.run(request, trace_id)
 
@@ -141,6 +131,7 @@ class AgentRuntime:
         with self.tracker.track_latency("agent.persist_assistant_message"):
             self.conversation_store.append_message(assistant_message)
 
+        runtime_errors: dict[str, str] = {}
         self._process_memory_after_response(
             user_message=user_message,
             assistant_message=assistant_message,
@@ -168,47 +159,6 @@ class AgentRuntime:
                 return
             for future in futures:
                 future.result()
-
-    def _handle_small_talk(
-        self,
-        *,
-        request: AgentRequest,
-        trace_id: str,
-        session: AgentSession,
-        runtime_errors: dict[str, str],
-    ) -> AgentResponse:
-        response = AgentResponse(
-            user_id=request.user_id,
-            thread_id=request.thread_id,
-            answer=small_talk_reply(request.message),
-            trace_id=trace_id,
-            metadata={
-                "fast_path": "small_talk",
-                "citations": [],
-                "insufficient_evidence": False,
-            },
-        )
-        assistant_message = ConversationMessage(
-            user_id=session.user_id,
-            thread_id=session.thread_id,
-            role="assistant",
-            content=response.answer,
-            metadata={"trace_id": trace_id, **response.metadata},
-        )
-
-        with self.tracker.track_latency("agent.persist_assistant_message"):
-            self.conversation_store.append_message(assistant_message)
-
-        if runtime_errors:
-            return response.model_copy(
-                update={
-                    "metadata": {
-                        **response.metadata,
-                        "runtime_errors": runtime_errors,
-                    }
-                }
-            )
-        return response
 
     def _process_memory_after_response(
         self,
@@ -249,7 +199,7 @@ class AgentRuntime:
         message: ConversationMessage,
         runtime_errors: dict[str, str],
     ) -> None:
-        if self.stm_writer is None or is_trivial_small_talk(message.content):
+        if self.stm_writer is None:
             return
 
         try:

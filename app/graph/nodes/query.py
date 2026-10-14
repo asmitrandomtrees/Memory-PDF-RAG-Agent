@@ -7,7 +7,6 @@ from app.contracts.routing import RetrievalPlan
 from app.graph.schemas import INDIA_TIMEZONE, QueryAnalysis
 from app.llm.prompts import render_chat_prompt
 from app.llm.provider import LLMProvider
-from app.runtime.text_utils import is_trivial_small_talk
 
 
 _ANALYSIS_PROMPT = ChatPromptTemplate.from_messages(
@@ -56,11 +55,6 @@ class QueryAnalyzer:
         prefer_pdf: bool = False,
     ) -> QueryAnalysis:
         document_ids = document_ids or []
-        if is_trivial_small_talk(query):
-            return QueryAnalysis(
-                intent="general",
-                normalized_query=query.strip() or "hello",
-            )
         if (document_ids or prefer_pdf) and _looks_like_standalone_general_query(
             query
         ):
@@ -152,9 +146,6 @@ def _looks_like_contextual_follow_up(query: str) -> bool:
 
     tokens = re.findall(r"[a-z0-9']+", normalized)
     if not tokens:
-        return False
-
-    if is_trivial_small_talk(query):
         return False
 
     token_set = set(tokens)

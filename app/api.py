@@ -19,7 +19,7 @@ from app.contracts.runtime import AgentRequest
 from app.runtime.conversation_store import JsonlConversationStore
 from app.runtime.thread_state import JsonThreadStateStore, ThreadSourceState
 
-LOCAL_USER_ID = "local-user-2"
+LOCAL_USER_ID = "local-user-4"
 FRONTEND_DIST = Path(__file__).resolve().parents[1] / "frontend" / "dist"
 PDF_SIGNATURE = b"%PDF-"
 PDF_ONLY_PATTERNS = (

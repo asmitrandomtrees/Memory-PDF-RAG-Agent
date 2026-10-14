@@ -55,7 +55,7 @@ class CreateThreadResponse(BaseModel):
 
 
 class UserProfileStore:
-    """Small SQLite store for users and their registered threads."""
+    """SQLite store for users and their registered threads."""
 
     def __init__(self, database_path: str | Path) -> None:
         self.database_path = Path(database_path)

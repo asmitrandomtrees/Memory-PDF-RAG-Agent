@@ -7,7 +7,6 @@ from app.contracts.errors import LLMError
 from app.graph.schemas import AnswerDraft, AnswerValidation, RewrittenQuery
 from app.llm.prompts import render_chat_prompt
 from app.llm.provider import LLMProvider
-from app.runtime.text_utils import is_trivial_small_talk, small_talk_reply
 
 
 _ANSWER_PROMPT = ChatPromptTemplate.from_messages(
@@ -138,13 +137,6 @@ class AnswerGenerator:
         self.llm = llm
 
     def generate(self, *, query: str, context: AgentContext) -> AnswerDraft:
-        if is_trivial_small_talk(query):
-            return AnswerDraft(
-                answer=small_talk_reply(query),
-                cited_item_ids=[],
-                insufficient_evidence=False,
-            )
-
         evidence = json.dumps(
             _evidence_payload(context),
             ensure_ascii=False,

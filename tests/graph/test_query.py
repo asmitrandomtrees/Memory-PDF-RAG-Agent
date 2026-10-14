@@ -1,7 +1,6 @@
 from app.contracts.routing import RetrievalPlan
 from app.graph.nodes.query import QueryAnalyzer, RetrievalPlanner
 from app.graph.schemas import QueryAnalysis
-from app.runtime.text_utils import is_trivial_small_talk
 
 
 class UnexpectedCallLLM:
@@ -23,14 +22,25 @@ class CapturingLLM:
         raise AssertionError(f"Unexpected schema: {output_schema}")
 
 
-def test_named_greeting_skips_query_analysis_and_planning() -> None:
-    llm = UnexpectedCallLLM()
+class GreetingAnalysisLLM:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def structured_output(self, messages, output_schema, *, temperature=None):
+        self.calls += 1
+        assert output_schema is QueryAnalysis
+        return QueryAnalysis(intent="general", normalized_query="Hi Stan!")
+
+
+def test_greeting_uses_query_analysis_then_deterministic_planning() -> None:
+    llm = GreetingAnalysisLLM()
     analysis = QueryAnalyzer(llm).analyze("Hi Stan!")
 
     assert analysis.intent == "general"
     assert analysis.normalized_query == "Hi Stan!"
+    assert llm.calls == 1
 
-    plan = RetrievalPlanner(llm).plan(
+    plan = RetrievalPlanner(UnexpectedCallLLM()).plan(
         query="Hi Stan!",
         analysis=analysis,
     )
@@ -44,14 +54,6 @@ def test_named_greeting_skips_query_analysis_and_planning() -> None:
             "reason": "standalone_general",
         },
     )
-
-
-def test_short_follow_up_is_not_classified_as_small_talk() -> None:
-    assert is_trivial_small_talk("Yes") is False
-    assert is_trivial_small_talk("Hi Stan!") is True
-    assert is_trivial_small_talk("Hii I am Michael") is True
-    assert is_trivial_small_talk("Hii, I am Jim") is True
-    assert is_trivial_small_talk("Hi I am building a PDF agent") is False
 
 
 def test_standalone_general_query_skips_analysis_and_planning_llm() -> None:
@@ -102,6 +104,14 @@ def test_memory_shaped_query_still_uses_analysis_llm() -> None:
     analysis = QueryAnalyzer(llm).analyze("What is my preferred database?")
 
     assert analysis.intent == "memory_recall"
+    assert llm.calls == 1
+
+
+def test_greeting_uses_query_analysis_llm() -> None:
+    llm = CapturingLLM()
+
+    QueryAnalyzer(llm).analyze("Hi Stan!")
+
     assert llm.calls == 1
 
 
