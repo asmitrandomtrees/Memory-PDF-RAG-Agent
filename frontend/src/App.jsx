@@ -16,6 +16,8 @@ import {
   X,
 } from "lucide-react";
 
+import ComparePanel from "./Compare.jsx";
+
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
 
 async function api(path, options = {}) {
@@ -51,6 +53,7 @@ function App() {
   const [error, setError] = useState("");
   const [uploadNotice, setUploadNotice] = useState("");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
   const fileInput = useRef(null);
   const messageList = useRef(null);
   const textarea = useRef(null);
