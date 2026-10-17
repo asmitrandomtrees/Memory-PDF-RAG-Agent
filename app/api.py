@@ -6,7 +6,7 @@ import re
 from typing import Annotated, Any, Callable
 from uuid import uuid4
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -16,8 +16,11 @@ from starlette.concurrency import run_in_threadpool
 from app.config.instance_settings import settings_for_instance
 from app.config.settings import Settings, get_settings
 from app.contracts.runtime import AgentRequest
+from app.embeddings.factory import create_embedding_provider
 from app.runtime.conversation_store import JsonlConversationStore
+from app.runtime.factory import create_runtime
 from app.runtime.thread_state import JsonThreadStateStore, ThreadSourceState
+from app.vectorstores.factory import create_vector_store
 
 LOCAL_USER_ID = "local-user-4"
 FRONTEND_DIST = Path(__file__).resolve().parents[1] / "frontend" / "dist"
@@ -61,11 +64,13 @@ class DocumentSummary(BaseModel):
     size_bytes: int
 
 
-def _build_services() -> dict[str, Any]:
-    from app.embeddings.factory import create_embedding_provider
-    from app.runtime.factory import create_runtime
-    from app.vectorstores.factory import create_vector_store
+class CompareRequest(BaseModel):
+    document_ids: list[str] = Field(min_length=2)
+    baseline_document_id: str | None = None
+    aspects: list[str] | None = None
 
+
+def _build_services() -> dict[str, Any]:
     settings = settings_for_instance(get_settings(), "api")
     embeddings = create_embedding_provider(settings)
     vector_store = create_vector_store(settings)
@@ -366,6 +371,79 @@ def create_app(
             path.unlink()
             return {"deleted": document_id}
         raise HTTPException(status_code=404, detail="Document not found")
+
+    @application.get("/api/compare/aspects")
+    def list_compare_aspects() -> list[dict[str, Any]]:
+        from app.comparison.aspects import DEFAULT_ASPECTS
+
+        return [aspect.model_dump(mode="json") for aspect in DEFAULT_ASPECTS]
+
+    @application.post("/api/compare")
+    async def compare_documents(body: CompareRequest) -> dict[str, Any]:
+        from app.comparison import (
+            COMPARISON_TIMEOUT_SECONDS,
+            SpecComparator,
+            documents_from_store,
+        )
+        from app.llm.azure_openai import AzureOpenAIProvider
+
+        services = application.state.services
+        settings: Settings = services["settings"]
+        store = services["vector_store"]
+        embeddings = services["embeddings"]
+
+        try:
+            documents = documents_from_store(
+                store,
+                settings.pdf_collection,
+                body.document_ids,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        llm = services.get("compare_llm") or services.get("llm") or AzureOpenAIProvider(
+            timeout_seconds=COMPARISON_TIMEOUT_SECONDS
+        )
+        comparator = SpecComparator(
+            llm=llm,
+            embeddings=embeddings,
+            vector_store=store,
+            collection=settings.pdf_collection,
+        )
+        try:
+            report = await run_in_threadpool(
+                comparator.compare,
+                documents,
+                baseline_document_id=body.baseline_document_id,
+                aspects=body.aspects,
+            )
+            return report.model_dump(mode="json")
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @application.post("/api/compare/export")
+    def export_comparison(
+        report: dict[str, Any],
+        format: str = "csv",
+    ) -> Response:
+        from app.comparison import to_csv, to_markdown
+        from app.comparison.schemas import ComparisonReport
+
+        try:
+            report_model = ComparisonReport.model_validate(report)
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail=f"Invalid report: {exc}")
+
+        if format.lower() == "csv":
+            content = to_csv(report_model)
+            media_type = "text/csv; charset=utf-8"
+        else:
+            content = to_markdown(report_model)
+            media_type = "text/markdown; charset=utf-8"
+
+        return Response(content=content, media_type=media_type)
 
     @application.get("/")
     def frontend_index():

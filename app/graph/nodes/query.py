@@ -170,6 +170,47 @@ def _deterministic_source_plan(
 ) -> RetrievalPlan | None:
     contextual_follow_up = _looks_like_contextual_follow_up(query)
     pdf_context = bool(document_ids) or prefer_pdf
+
+    if analysis.intent == "mixed":
+        return RetrievalPlan(
+            use_stm=True,
+            use_ltm=True,
+            use_pdf=pdf_context,
+            metadata={
+                "router": "deterministic",
+                "reason": "mixed",
+            },
+        )
+
+    if analysis.intent == "memory_recall":
+        return RetrievalPlan(
+            use_stm=True,
+            use_ltm=True,
+            use_pdf=pdf_context,
+            metadata={
+                "router": "deterministic",
+                "reason": "memory_recall",
+            },
+        )
+
+    if analysis.intent == "episodic_recall":
+        return RetrievalPlan(
+            use_stm=True,
+            use_pdf=pdf_context,
+            metadata={
+                "router": "deterministic",
+                "reason": "episodic_recall",
+            },
+        )
+
+    if _looks_like_profile_statement(query):
+        return RetrievalPlan(
+            metadata={
+                "router": "deterministic",
+                "reason": "profile_statement",
+            },
+        )
+
     if pdf_context:
         return RetrievalPlan(
             use_stm=contextual_follow_up,
@@ -187,17 +228,10 @@ def _deterministic_source_plan(
     if _looks_like_explicit_document_query(query) or analysis.intent == "document_question":
         return RetrievalPlan(
             use_pdf=True,
+            use_stm=contextual_follow_up,
             metadata={
                 "router": "deterministic",
                 "reason": "document_query",
-            },
-        )
-
-    if _looks_like_profile_statement(query):
-        return RetrievalPlan(
-            metadata={
-                "router": "deterministic",
-                "reason": "profile_statement",
             },
         )
 
@@ -207,25 +241,6 @@ def _deterministic_source_plan(
             metadata={
                 "router": "deterministic",
                 "reason": "contextual_follow_up",
-            },
-        )
-
-    if analysis.intent == "episodic_recall":
-        return RetrievalPlan(
-            use_stm=True,
-            metadata={
-                "router": "deterministic",
-                "reason": "episodic_recall",
-            },
-        )
-
-    if analysis.intent == "memory_recall":
-        return RetrievalPlan(
-            use_stm=True,
-            use_ltm=True,
-            metadata={
-                "router": "deterministic",
-                "reason": "memory_recall",
             },
         )
 

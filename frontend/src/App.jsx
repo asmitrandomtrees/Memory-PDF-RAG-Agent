@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   FileText,
   FolderOpen,
+  GitCompareArrows,
   LoaderCircle,
   MessageSquare,
   Plus,
@@ -16,21 +17,8 @@ import {
   X,
 } from "lucide-react";
 
+import { API_BASE_URL, api } from "./api.js";
 import ComparePanel from "./Compare.jsx";
-
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
-
-async function api(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, options);
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const detail = typeof payload.detail === "string"
-      ? payload.detail
-      : `Request failed (${response.status})`;
-    throw new Error(detail);
-  }
-  return payload;
-}
 
 function formatTime(timestamp) {
   if (!timestamp) return "";
@@ -323,9 +311,21 @@ function App() {
             <h2 className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#9ca7a8]">
               Knowledge base
             </h2>
-            <span className="rounded-md bg-[#f1f4f4] px-1.5 py-0.5 text-[10px] font-semibold text-[#8b9697]">
-              {documents.length}
-            </span>
+            <div className="flex items-center gap-1.5">
+              {documents.length >= 2 && (
+                <button
+                  onClick={() => setCompareOpen(true)}
+                  className="flex items-center gap-1 rounded-md bg-[#edf7f5] px-2 py-0.5 text-[10px] font-semibold text-[#117d70] hover:bg-[#d9f5ef] transition"
+                  title="Compare specifications"
+                >
+                  <GitCompareArrows size={11} />
+                  Compare
+                </button>
+              )}
+              <span className="rounded-md bg-[#f1f4f4] px-1.5 py-0.5 text-[10px] font-semibold text-[#8b9697]">
+                {documents.length}
+              </span>
+            </div>
           </div>
 
           <div className="mb-3 rounded-xl border border-dashed border-[#d9e2e1] bg-[#fbfcfc] p-3">
@@ -444,9 +444,21 @@ function App() {
               </span>
             </span>
           </div>
-          <div className="flex items-center gap-2 rounded-full border border-[#e9eeee] bg-white px-3 py-1.5 text-[10px] font-medium text-[#819091]">
-            <CheckCircle2 size={13} className="text-[#53a888]" />
-            Local agent
+          <div className="flex items-center gap-2">
+            {documents.length >= 2 && (
+              <button
+                onClick={() => setCompareOpen(true)}
+                className="flex items-center gap-1.5 rounded-full border border-[#dfe8e6] bg-white px-3 py-1.5 text-[10px] font-semibold text-[#117d70] shadow-xs transition hover:border-[#9ecfc4] hover:bg-[#edf7f5]"
+                title="Compare specifications"
+              >
+                <GitCompareArrows size={12} />
+                Compare specs
+              </button>
+            )}
+            <div className="flex items-center gap-2 rounded-full border border-[#e9eeee] bg-white px-3 py-1.5 text-[10px] font-medium text-[#819091]">
+              <CheckCircle2 size={13} className="text-[#53a888]" />
+              Local agent
+            </div>
           </div>
         </header>
 
@@ -590,6 +602,13 @@ function App() {
           </p>
         </div>
       </main>
+
+      {compareOpen && (
+        <ComparePanel
+          documents={documents}
+          onClose={() => setCompareOpen(false)}
+        />
+      )}
     </div>
   );
 }

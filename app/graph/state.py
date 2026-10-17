@@ -40,6 +40,7 @@ class GraphState(TypedDict, total=False):
     context: AgentContext | None
     answer: str
     cited_item_ids: list[str]
+    quotes: list[Any]
     insufficient_evidence: bool
     validation: dict[str, Any]
 

@@ -164,6 +164,36 @@ def test_provider_initializes_azure_model_from_settings(monkeypatch) -> None:
     assert provider.chat_model.temperature is None or provider.chat_model.temperature == 0.0
 
 
+def test_provider_passes_optional_timeout_to_azure_model(monkeypatch) -> None:
+    import langchain_openai
+
+    captured_options = {}
+
+    class FakeAzureChatOpenAI:
+        def __init__(self, **kwargs) -> None:
+            captured_options.update(kwargs)
+
+    monkeypatch.setattr(
+        "app.llm.azure_openai.get_settings",
+        lambda: SimpleNamespace(
+            openai_api_key="test-key",
+            openai_deployment="test-deployment",
+            openai_api_version="2024-10-21",
+            openai_endpoint="https://example.openai.azure.com",
+        ),
+    )
+    monkeypatch.setattr(
+        langchain_openai,
+        "AzureChatOpenAI",
+        FakeAzureChatOpenAI,
+    )
+
+    provider = AzureOpenAIProvider(timeout_seconds=180.0)
+
+    assert provider.chat_model is not None
+    assert captured_options["timeout"] == 180.0
+
+
 def test_structured_output_falls_back_when_temperature_rejected() -> None:
     class ModelRejectingTemperature(FakeChatModel):
         def invoke(self, messages, **kwargs):

@@ -103,10 +103,7 @@ def _test_client(tmp_path: Path):
     profile_store = multiuser_api.UserProfileStore(
         tmp_path / "profiles" / "users.sqlite3"
     )
-    conversation_store = multiuser_api.ProfileConversationStore(
-        JsonlConversationStore(settings.conversation_data_path),
-        profile_store,
-    )
+    conversation_store = JsonlConversationStore(settings.conversation_data_path)
     thread_state_store = JsonThreadStateStore(tmp_path / "thread_state")
     vector_store = FakeVectorStore()
     services = {
@@ -353,6 +350,123 @@ def test_documents_are_scoped_by_profile(tmp_path, monkeypatch) -> None:
         )
         assert wrong_owner_delete.status_code == 404
         assert len(vector_store.items) == 2
+
+
+def test_compare_endpoints_are_scoped_by_profile(tmp_path, monkeypatch) -> None:
+    import app.comparison as comparison
+    import app.api_multiuser as multiuser_api
+    from app.comparison.schemas import ComparisonReport
+
+    client, vector_store, _ = _test_client(tmp_path)
+    comparison_calls = []
+    compare_llm = object()
+
+    class FakeComparator:
+        def __init__(self, *, llm, embeddings, vector_store, collection) -> None:
+            comparison_calls.append(
+                {
+                    "llm": llm,
+                    "collection": collection,
+                }
+            )
+
+        def compare(
+            self,
+            documents,
+            *,
+            baseline_document_id=None,
+            aspects=None,
+        ):
+            comparison_calls[-1]["document_ids"] = [
+                document.document_id for document in documents
+            ]
+            comparison_calls[-1]["baseline_document_id"] = baseline_document_id
+            comparison_calls[-1]["aspects"] = aspects
+            return ComparisonReport(
+                documents=documents,
+                baseline_document_id=baseline_document_id or documents[0].document_id,
+                aspects=[],
+            )
+
+    monkeypatch.setattr(comparison, "SpecComparator", FakeComparator)
+
+    with client:
+        for user_id in ("alice", "bob"):
+            created = client.post(
+                "/api/users",
+                json={"user_id": user_id},
+            )
+            assert created.status_code == 201
+        alice_collection = multiuser_api._user_pdf_collection(
+            "test-pdfs",
+            "alice",
+        )
+        bob_collection = multiuser_api._user_pdf_collection(
+            "test-pdfs",
+            "bob",
+        )
+        for collection, document_id, filename in (
+            (alice_collection, "alice-spec", "Alice.pdf"),
+            (alice_collection, "alice-vendor", "Vendor.pdf"),
+            (bob_collection, "bob-spec", "Bob.pdf"),
+            (bob_collection, "bob-vendor", "Vendor.pdf"),
+        ):
+            vector_store.add(
+                collection=collection,
+                ids=[document_id],
+                documents=[f"content for {document_id}"],
+                embeddings=[[1.0, 0.0]],
+                metadatas=[
+                    {
+                        "document_id": document_id,
+                        "filename": filename,
+                    }
+                ],
+            )
+        client.app.state.services["compare_llm"] = compare_llm
+
+        aspects_response = client.get(
+            "/api/users/alice/compare/aspects"
+        )
+        assert aspects_response.status_code == 200
+        assert aspects_response.json()[0]["key"] == "fan_motor"
+
+        compare_response = client.post(
+            "/api/users/alice/compare",
+            json={
+                "document_ids": ["alice-spec", "alice-vendor"],
+                "baseline_document_id": "alice-spec",
+                "aspects": ["fan_motor"],
+            },
+        )
+        assert compare_response.status_code == 200
+        assert [doc["document_id"] for doc in compare_response.json()["documents"]] == [
+            "alice-spec",
+            "alice-vendor",
+        ]
+        assert comparison_calls[0]["collection"] == alice_collection
+        assert comparison_calls[0]["llm"] is compare_llm
+        assert comparison_calls[0]["baseline_document_id"] == "alice-spec"
+        assert comparison_calls[0]["aspects"] == ["fan_motor"]
+
+        not_owned = client.post(
+            "/api/users/alice/compare",
+            json={"document_ids": ["bob-spec", "bob-vendor"]},
+        )
+        assert not_owned.status_code == 404
+
+        export_response = client.post(
+            "/api/users/alice/compare/export?format=md",
+            json=compare_response.json(),
+        )
+        assert export_response.status_code == 200
+        assert "text/markdown" in export_response.headers["content-type"]
+        assert "# Specification Comparison" in export_response.text
+
+        unknown_user = client.get(
+            "/api/users/unknown/compare/aspects"
+        )
+        assert unknown_user.status_code == 404
 
 
 def test_invalid_profile_id_is_rejected(tmp_path) -> None:

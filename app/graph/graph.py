@@ -10,6 +10,7 @@ from app.contracts.retrieval import MergedRetrievalResult
 from app.contracts.retrieval import RetrievedItem
 from app.contracts.runtime import AgentRequest, AgentResponse, ConversationStore
 from app.contracts.tracing import GraphTrace, RetrievalTrace
+from app.graph.evidence import extract_evidence
 from app.graph.nodes.answer import (
     AnswerEvidenceValidator,
     AnswerGenerator,
@@ -329,7 +330,7 @@ class RetrievalPipeline:
             start_at, end_at = resolve_calendar_day(analysis)
             return {
                 "query_analysis": analysis,
-                "rewritten_query": analysis.normalized_query,
+                "rewritten_query": query if state.get("rewritten_query") else analysis.normalized_query,
                 "date_start_at": start_at,
                 "date_end_at": end_at,
                 "prefer_pdf_context": prefer_pdf,

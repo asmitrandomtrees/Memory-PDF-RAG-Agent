@@ -57,6 +57,11 @@ class QueryAnalysis(BaseModel):
         return self
 
 
+class EvidenceQuote(BaseModel):
+    item_id: str
+    quote: str
+
+
 class AnswerDraft(BaseModel):
     answer: str = Field(
         min_length=1,
@@ -72,7 +77,22 @@ class AnswerDraft(BaseModel):
             "or document-specific claims. Never include these IDs in answer."
         ),
     )
+    quotes: list[EvidenceQuote] = Field(
+        default_factory=list,
+        description=(
+            "Verbatim quotes copied from cited items that support each claim."
+        ),
+    )
     insufficient_evidence: bool = False
+
+    @field_validator("quotes", mode="before")
+    @classmethod
+    def coerce_quotes(cls, v: Any) -> list[Any]:
+        if v is None:
+            return []
+        if isinstance(v, list):
+            return v
+        return []
 
     @field_validator("cited_item_ids", mode="before")
     @classmethod

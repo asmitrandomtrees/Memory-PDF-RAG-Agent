@@ -278,3 +278,64 @@ def test_upload_rejects_non_pdf_and_blank_chat(tmp_path) -> None:
             json={"message": "   "},
         )
         assert blank_message.status_code == 422
+
+
+def test_compare_endpoints(tmp_path) -> None:
+    client, _ = _test_client(tmp_path)
+    with client:
+        resp = client.get("/api/compare/aspects")
+        assert resp.status_code == 200
+        aspects = resp.json()
+        assert len(aspects) > 0
+        assert aspects[0]["key"] == "fan_motor"
+
+        sample_report = {
+            "documents": [
+                {"document_id": "doc1", "filename": "Spec.pdf"},
+                {"document_id": "doc2", "filename": "Vendor.pdf"},
+            ],
+            "baseline_document_id": "doc1",
+            "aspects": [
+                {
+                    "key": "fan_motor",
+                    "title": "Fan motor ratings",
+                    "summary": "Vendor meets spec.",
+                    "rows": [
+                        {
+                            "aspect": "fan_motor",
+                            "parameter": "Motor type",
+                            "status": "match",
+                            "cells": [
+                                {
+                                    "document_id": "doc1",
+                                    "value": "TEFC",
+                                    "assessment": "baseline",
+                                    "verified": True,
+                                },
+                                {
+                                    "document_id": "doc2",
+                                    "value": "TEFC",
+                                    "assessment": "compliant",
+                                    "verified": True,
+                                },
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+        csv_resp = client.post(
+            "/api/compare/export?format=csv",
+            json=sample_report,
+        )
+        assert csv_resp.status_code == 200
+        assert "text/csv" in csv_resp.headers["content-type"]
+        assert "Fan motor ratings" in csv_resp.text
+
+        md_resp = client.post(
+            "/api/compare/export?format=md",
+            json=sample_report,
+        )
+        assert md_resp.status_code == 200
+        assert "text/markdown" in md_resp.headers["content-type"]
+        assert "# Specification Comparison" in md_resp.text

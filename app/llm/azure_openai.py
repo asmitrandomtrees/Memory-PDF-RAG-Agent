@@ -22,6 +22,7 @@ class AzureOpenAIProvider:
         *,
         chat_model: Any | None = None,
         callbacks: Sequence[BaseCallbackHandler] | None = None,
+        timeout_seconds: float | None = None,
     ) -> None:
         self.callbacks = list(callbacks or [])
         if chat_model is not None:
@@ -49,11 +50,16 @@ class AzureOpenAIProvider:
         try:
             from langchain_openai import AzureChatOpenAI
 
+            model_options: dict[str, Any] = {}
+            if timeout_seconds is not None:
+                model_options["timeout"] = timeout_seconds
+
             self.chat_model = AzureChatOpenAI(
                 azure_endpoint=settings.openai_endpoint,
                 api_key=settings.openai_api_key,
                 azure_deployment=settings.openai_deployment,
                 api_version=settings.openai_api_version,
+                **model_options,
             )
         except Exception as exc:
             raise ConfigurationError(
